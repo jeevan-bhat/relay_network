@@ -7,11 +7,11 @@ Write-Host "==========================================================" -Foregro
 Write-Host ""
 
 # 1. Start Relay Server in background
-$relayPath = Join-Path $PSScriptRoot "..\relay\terminal-relay.exe"
+$relayPath = Join-Path $PSScriptRoot "..\terminal-relay.exe"
 if (-not (Test-Path $relayPath)) {
     Write-Host "Building terminal-relay.exe..." -ForegroundColor Yellow
-    Push-Location (Join-Path $PSScriptRoot "..\relay")
-    go build -o terminal-relay.exe ./cmd/terminal-relay
+    Push-Location (Join-Path $PSScriptRoot "..")
+    go build -o terminal-relay.exe .
     Pop-Location
 }
 
