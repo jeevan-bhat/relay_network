@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -37,6 +38,19 @@ func main() {
 	cfg.DBPath = *dbPath
 	cfg.AuthToken = *token
 	cfg.HeartbeatInterval = *heartbeat
+
+	// Support standard Cloud environment variables (Render, Fly.io, Railway, Docker)
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		if p, err := strconv.Atoi(envPort); err == nil {
+			cfg.Port = p
+		}
+	}
+	if envDB := os.Getenv("DB_PATH"); envDB != "" {
+		cfg.DBPath = envDB
+	}
+	if envToken := os.Getenv("AUTH_TOKEN"); envToken != "" {
+		cfg.AuthToken = envToken
+	}
 
 	// Ensure DB directory exists
 	if dir := filepath.Dir(cfg.DBPath); dir != "" && dir != "." {

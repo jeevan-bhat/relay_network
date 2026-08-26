@@ -2,15 +2,11 @@ services:
   - type: web
     name: terminal-relay
     env: docker
+    plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    plan: free
-    disk:
-      name: relay-data
-      mountPath: /app/data
-      sizeGB: 1
     envVars:
       - key: PORT
-        value: 8080
+        value: 10000
       - key: DB_PATH
         value: /app/data/relay.db

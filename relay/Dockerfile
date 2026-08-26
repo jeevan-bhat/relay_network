@@ -13,12 +13,13 @@ FROM alpine:3.21
 RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
+RUN mkdir -p /app/data
+
 COPY --from=builder /app/terminal-relay /app/terminal-relay
 
-EXPOSE 8080
-VOLUME ["/app/data"]
+EXPOSE 8080 10000
 
-ENV PORT=8080
+ENV PORT=10000
 ENV DB_PATH=/app/data/relay.db
 
 ENTRYPOINT ["/app/terminal-relay"]
