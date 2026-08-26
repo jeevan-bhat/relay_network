@@ -2,16 +2,13 @@
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
-ENV GOWORK=off
 
-# Copy dependencies
-COPY go.mod go.sum ./
-RUN go mod download
+RUN apk add --no-cache git ca-certificates
 
 # Copy source code
 COPY . .
 
-# Build statically linked binary
+# Build statically linked binary directly
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/terminal-relay .
 
 # Minimal production image
