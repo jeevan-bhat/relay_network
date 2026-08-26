@@ -14,6 +14,8 @@ agent.log
 
 # Go
 /vendor/
+go.work
+go.work.sum
 
 # OS / editor cruft
 .DS_Store
