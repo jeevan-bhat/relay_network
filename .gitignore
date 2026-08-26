@@ -1,0 +1,22 @@
+# Build output
+*.exe
+/bin/
+/agent/terminal-agent
+
+# Local queue database and logs
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+/agent/data/
+agent.log
+
+# Go
+/vendor/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
