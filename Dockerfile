@@ -4,15 +4,12 @@ FROM golang:1.24-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache git ca-certificates
 
-# Copy dependency files
+# Copy project files
 COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source files needed for relay
 COPY main.go ./
 COPY internal/ ./internal/
 
-# Build statically linked binary
+# Build statically linked binary directly
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/terminal-relay main.go
 
 # Minimal production image
