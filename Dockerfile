@@ -2,10 +2,15 @@
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
-COPY go.mod go.sum ./
+
+# Copy relay module dependencies
+COPY relay/go.mod relay/go.sum ./
 RUN go mod download
 
-COPY . .
+# Copy relay source code
+COPY relay/ .
+
+# Build statically linked binary
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/terminal-relay ./cmd/terminal-relay
 
 # Minimal production image

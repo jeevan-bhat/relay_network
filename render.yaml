@@ -2,8 +2,8 @@ services:
   - type: web
     name: terminal-relay
     env: docker
-    dockerfilePath: ./relay/Dockerfile
-    dockerContext: ./relay
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     disk:
       name: relay-data
