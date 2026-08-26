@@ -2,6 +2,7 @@
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
+ENV GOWORK=off
 
 # Copy relay module dependencies
 COPY relay/go.mod relay/go.sum ./
