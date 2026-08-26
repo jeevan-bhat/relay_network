@@ -143,6 +143,24 @@ func (s *Store) Enqueue(p Payload) (string, error) {
 	return id, nil
 }
 
+// EnqueueWithID inserts a command with an existing ID (e.g. dispatched from Relay).
+// If a command with this ID already exists, it is ignored.
+func (s *Store) EnqueueWithID(id string, p Payload) error {
+	raw, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO CommandQueue (CommandId, Payload, Status, CreatedAt, Attempts)
+		 VALUES (?, ?, ?, ?, 0)
+		 ON CONFLICT(CommandId) DO NOTHING`,
+		id, string(raw), StatusPending, time.Now().Unix())
+	if err != nil {
+		return fmt.Errorf("enqueue with id: %w", err)
+	}
+	return nil
+}
+
 // ClaimNext atomically transitions the oldest eligible PENDING command
 // (Attempts < maxAttempts) to EXECUTING, increments its attempt counter, and
 // returns it. Returns (nil, nil) when there is nothing to claim.
@@ -307,3 +325,35 @@ func (s *Store) ListResults(commandID string, limit int) ([]Result, error) {
 	}
 	return out, rows.Err()
 }
+
+// ListUnsyncedResults returns all results that have Synced = 0 (false).
+func (s *Store) ListUnsyncedResults(limit int) ([]Result, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.Query(
+		`SELECT ResultId, CommandId, Stdout, Stderr, ExitCode, ExecutedAt, Synced
+		   FROM ResultQueue WHERE Synced = 0 ORDER BY ExecutedAt ASC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Result
+	for rows.Next() {
+		var r Result
+		var synced int
+		if err := rows.Scan(&r.ResultID, &r.CommandID, &r.Stdout, &r.Stderr, &r.ExitCode, &r.ExecutedAt, &synced); err != nil {
+			return nil, err
+		}
+		r.Synced = synced != 0
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// MarkResultSynced sets Synced = 1 for a CommandId.
+func (s *Store) MarkResultSynced(commandID string) error {
+	_, err := s.db.Exec(`UPDATE ResultQueue SET Synced = 1 WHERE CommandId = ?`, commandID)
+	return err
+}
+

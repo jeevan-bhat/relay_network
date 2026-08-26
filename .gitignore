@@ -9,6 +9,7 @@
 *.db-shm
 *.db-journal
 /agent/data/
+/relay/data/
 agent.log
 
 # Go

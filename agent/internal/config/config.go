@@ -19,18 +19,34 @@ type Config struct {
 	MaxAttempts int
 	// ExecPolicy is the PowerShell -ExecutionPolicy value.
 	ExecPolicy string
+	// RelayURL is the WebSocket URL to the central Relay server (e.g. ws://localhost:8080/ws).
+	RelayURL string
+	// DeviceID identifies this agent machine. Defaults to OS hostname.
+	DeviceID string
+	// AuthToken is the shared secret for authenticating to the Relay.
+	AuthToken string
+	// HeartbeatInterval is the duration between telemetry heartbeats.
+	HeartbeatInterval time.Duration
 }
 
 // Default returns the baseline configuration. DBPath honors the
 // TERMINAL_AGENT_DB environment variable, else falls back to
 // %ProgramData%\TerminalAgent\queue.db (shared, writable by the service).
 func Default() Config {
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "win-agent"
+	}
 	return Config{
-		DBPath:       DefaultDBPath(),
-		Timeout:      60 * time.Second,
-		PollInterval: 1 * time.Second,
-		MaxAttempts:  3,
-		ExecPolicy:   "Bypass",
+		DBPath:            DefaultDBPath(),
+		Timeout:           60 * time.Second,
+		PollInterval:      1 * time.Second,
+		MaxAttempts:       3,
+		ExecPolicy:        "Bypass",
+		RelayURL:          os.Getenv("TERMINAL_RELAY_URL"),
+		DeviceID:          hostname,
+		AuthToken:         os.Getenv("TERMINAL_AUTH_TOKEN"),
+		HeartbeatInterval: 15 * time.Second,
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"terminalagent/internal/config"
 	"terminalagent/internal/executor"
+	"terminalagent/internal/netclient"
 	"terminalagent/internal/store"
 	"terminalagent/internal/worker"
 )
@@ -54,7 +55,19 @@ func (p *program) run(ctx context.Context) {
 	}
 
 	w := worker.New(st, executor.New(p.cfg.ExecPolicy), p.cfg, p.log)
-	p.log.Info("agent started", "db", p.cfg.DBPath)
+
+	var client *netclient.Client
+	if p.cfg.RelayURL != "" {
+		client = netclient.New(st, p.cfg, func() {
+			w.Wake()
+		}, p.log)
+		w.SetOnResult(func(res store.Result) {
+			client.ReportResult(res)
+		})
+		go client.Run(ctx)
+	}
+
+	p.log.Info("agent started", "db", p.cfg.DBPath, "relay", p.cfg.RelayURL, "deviceId", p.cfg.DeviceID)
 	if err := w.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		p.log.Error("worker stopped", "err", err)
 	}

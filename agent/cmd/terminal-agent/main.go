@@ -26,6 +26,7 @@ import (
 
 	"terminalagent/internal/config"
 	"terminalagent/internal/executor"
+	"terminalagent/internal/netclient"
 	"terminalagent/internal/service"
 	"terminalagent/internal/store"
 	"terminalagent/internal/worker"
@@ -56,10 +57,11 @@ func main() {
 }
 
 func usage() {
-	fmt.Print(`terminal-agent — resilient remote-terminal agent (Phase 1)
+	fmt.Print(`terminal-agent — resilient remote-terminal agent (Phase 2 & 3: Relay + Resilience)
 
 Commands:
-  run       [--db PATH] [--timeout DUR] [--poll DUR] [--drain]   run the worker in the foreground (dev)
+  run       [--db PATH] [--relay URL] [--device-id ID] [--token SEC] [--timeout DUR] [--poll DUR] [--drain]
+            run the worker in the foreground (dev / connected mode)
   enqueue   [--db PATH] [--timeoutSec N] "<command>"             add a PowerShell command to the queue
   results   [--db PATH] [--id ID] [--limit N]                    show execution results
   queue     [--db PATH] [--limit N]                              show queued commands
@@ -90,6 +92,9 @@ func cmdRun(args []string) {
 	def := config.Default()
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	dbPath := fs.String("db", def.DBPath, "path to the queue database")
+	relayURL := fs.String("relay", def.RelayURL, "Relay WebSocket URL (e.g. ws://localhost:8080/ws)")
+	deviceID := fs.String("device-id", def.DeviceID, "unique device identifier for this agent")
+	token := fs.String("token", def.AuthToken, "secret token for relay authentication")
 	timeout := fs.Duration("timeout", def.Timeout, "per-command hard timeout")
 	poll := fs.Duration("poll", def.PollInterval, "queue poll interval when idle")
 	drain := fs.Bool("drain", false, "process the queue until empty, then exit (no polling)")
@@ -97,6 +102,9 @@ func cmdRun(args []string) {
 
 	cfg := def
 	cfg.DBPath = *dbPath
+	cfg.RelayURL = *relayURL
+	cfg.DeviceID = *deviceID
+	cfg.AuthToken = *token
 	cfg.Timeout = *timeout
 	cfg.PollInterval = *poll
 
@@ -128,6 +136,17 @@ func cmdRun(args []string) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	if cfg.RelayURL != "" {
+		client := netclient.New(st, cfg, func() {
+			w.Wake()
+		}, log)
+		w.SetOnResult(func(res store.Result) {
+			client.ReportResult(res)
+		})
+		go client.Run(ctx)
+		log.Info("relay client started", "relay", cfg.RelayURL, "deviceId", cfg.DeviceID)
+	}
 
 	log.Info("worker running (ctrl+c to stop)", "db", cfg.DBPath, "timeout", cfg.Timeout)
 	if err := w.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {

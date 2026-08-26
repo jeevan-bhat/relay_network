@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Terminal App — Remote Administration & Mobile Controller</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0fdf4', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' },
+            dark: { 800: '#1e293b', 850: '#172033', 900: '#0f172a', 950: '#020617' }
+          },
+          fontFamily: {
+            mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .terminal-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+    .terminal-scroll::-webkit-scrollbar-track { background: #0f172a; }
+    .terminal-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    button, input, select { touch-action: manipulation; }
+  </style>
+</head>
+<body class="bg-dark-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-black pb-16 md:pb-0">
+
+  <!-- Top App Bar -->
+  <header class="bg-dark-900/95 backdrop-blur border-b border-slate-800 px-4 py-2.5 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center font-mono font-bold text-black text-sm shadow-md shadow-brand-500/20">
+        &gt;_
+      </div>
+      <div>
+        <h1 class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+          Terminal App <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-normal">v4.0 Mobile</span>
+        </h1>
+        <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+          <span id="activeDevStatusDot" class="w-2 h-2 rounded-full bg-slate-600"></span>
+          <span id="activeDevHeaderTitle" class="font-mono text-slate-300">Select target device</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Device Picker & Relay Badge -->
+    <div class="flex items-center space-x-2 text-xs font-mono">
+      <select id="deviceSelector" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 max-w-[140px] sm:max-w-none truncate">
+        <option value="">(No Devices)</option>
+      </select>
+      <div id="relayBadge" class="hidden sm:flex items-center space-x-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
+        <span id="relayStatusDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="relayStatusText" class="text-[11px] text-slate-300">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Desktop Tab Bar (Hidden on Mobile) -->
+  <nav class="hidden md:flex bg-dark-900 border-b border-slate-800 px-6 py-2 items-center space-x-4 text-xs font-medium">
+    <button onclick="switchTab('terminal')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="terminal">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+      Terminal &amp; Commands
+    </button>
+    <button onclick="switchTab('files')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="files">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+      File Explorer &amp; Download
+    </button>
+    <button onclick="switchTab('health')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="health">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+      Health &amp; Processes
+    </button>
+    <button onclick="switchTab('audit')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="audit">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+      Audit Logs
+    </button>
+  </nav>
+
+  <!-- Main Viewports -->
+  <main class="flex-1 max-w-[1400px] w-full mx-auto p-3 sm:p-5 flex flex-col space-y-4">
+
+    <!-- ============================================================== -->
+    <!-- TAB 1: TERMINAL & PREDEFINED COMMANDS                          -->
+    <!-- ============================================================== -->
+    <div id="tab-terminal" class="tab-content flex-1 flex flex-col space-y-3">
+      
+      <!-- Predefined Commands Card / Drawer -->
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <span class="text-amber-400">⚡</span> Predefined &amp; Basic Commands
+            <span class="text-[10px] text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800">Works Online &amp; Offline</span>
+          </span>
+          <button id="togglePredefBtn" class="text-[11px] text-slate-400 hover:text-slate-200">Hide/Show</button>
+        </div>
+        <div id="predefGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-1.5 text-xs font-mono">
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="status">
+            <span class="font-bold text-emerald-400">status</span>
+            <span class="text-[10px] text-slate-400">Power state &amp; last seen</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="health">
+            <span class="font-bold text-emerald-400">health</span>
+            <span class="text-[10px] text-slate-400">CPU, RAM &amp; Uptime</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="Get-Date">
+            <span class="font-bold text-emerald-400">Get-Date</span>
+            <span class="text-[10px] text-slate-400">Current Date &amp; Time</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="systeminfo">
+            <span class="font-bold text-emerald-400">systeminfo</span>
+            <span class="text-[10px] text-slate-400">OS, RAM &amp; Disk info</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="whoami">
+            <span class="font-bold text-emerald-400">whoami</span>
+            <span class="text-[10px] text-slate-400">User context</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="ipconfig">
+            <span class="font-bold text-emerald-400">ipconfig</span>
+            <span class="text-[10px] text-slate-400">Network &amp; WebSocket</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="uptime">
+            <span class="font-bold text-emerald-400">uptime</span>
+            <span class="text-[10px] text-slate-400">System uptime</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="queue">
+            <span class="font-bold text-amber-400">queue</span>
+            <span class="text-[10px] text-slate-400">Pending offline tasks</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="clear-queue">
+            <span class="font-bold text-amber-400">clear-queue</span>
+            <span class="text-[10px] text-slate-400">Purge pending tasks</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="wake">
+            <span class="font-bold text-amber-400">wake</span>
+            <span class="text-[10px] text-slate-400">Send Wake-on-LAN</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="ping">
+            <span class="font-bold text-cyan-400">ping</span>
+            <span class="text-[10px] text-slate-400">Probe relay latency</span>
+          </button>
+          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="help">
+            <span class="font-bold text-cyan-400">help</span>
+            <span class="text-[10px] text-slate-400">Command reference</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Terminal Console Container -->
+      <div class="bg-dark-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl flex flex-col flex-1 min-h-[440px]">
+        <!-- Console Toolbar -->
+        <div class="bg-slate-950 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+            <span class="text-xs text-slate-400 font-mono ml-2">Remote PowerShell Console</span>
+          </div>
+          <button id="clearConsoleBtn" class="text-[11px] text-slate-400 hover:text-slate-200 px-2.5 py-0.5 rounded bg-slate-800/80">
+            Clear
+          </button>
+        </div>
+
+        <!-- Terminal Output -->
+        <div id="terminalOutput" class="flex-1 p-3.5 font-mono text-xs overflow-y-auto terminal-scroll bg-[#090d16] text-slate-200 space-y-2.5">
+          <div class="text-slate-500 text-[11px]">
+            [System] Remote PowerShell Console ready.<br>
+            [System] Basic &amp; predefined commands execute immediately in Cloud when agent is offline.
+          </div>
+        </div>
+
+        <!-- Mobile Touch Keyboard Toolbar -->
+        <div class="bg-slate-950/90 px-2 py-1.5 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto terminal-scroll text-xs font-mono">
+          <button class="touch-key px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 font-bold" data-key="Tab">Tab</button>
+          <button class="touch-key px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 font-bold" data-key="|">|</button>
+          <button class="touch-key px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 font-bold" data-key="\\">\</button>
+          <button class="touch-key px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 font-bold" data-key="$">$</button>
+          <button class="touch-key px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 font-bold" data-key="-">-</button>
+          <button class="touch-key px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 font-bold" data-key="Up">↑</button>
+          <button class="touch-key px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 font-bold" data-key="Down">↓</button>
+          <div class="h-4 w-px bg-slate-800 shrink-0 mx-1"></div>
+          <button class="preset-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 shrink-0 text-[11px]" data-cmd="Get-Process | Select-Object -First 8 Name, Id, WorkingSet">Get-Process</button>
+          <button class="preset-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 shrink-0 text-[11px]" data-cmd="Get-Service">Get-Service</button>
+        </div>
+
+        <!-- Terminal Prompt Input -->
+        <form id="commandForm" class="bg-slate-950 p-2.5 border-t border-slate-800 flex items-center space-x-2">
+          <span class="text-emerald-400 font-mono text-sm font-bold pl-1">PS&gt;</span>
+          <input 
+            type="text" 
+            id="cmdInput" 
+            class="flex-1 bg-transparent text-white font-mono text-xs sm:text-sm px-2 py-1.5 focus:outline-none placeholder-slate-600" 
+            placeholder="Type PowerShell or predefined command..." 
+            autocomplete="off"
+            autocapitalize="none"
+          />
+          <button 
+            type="submit" 
+            class="bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs px-3.5 py-2 rounded-lg font-mono flex items-center gap-1 transition"
+          >
+            <span>Run</span>
+          </button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: REMOTE FILE EXPLORER & DOWNLOAD                        -->
+    <!-- ============================================================== -->
+    <div id="tab-files" class="tab-content hidden flex-1 flex flex-col space-y-4">
+      
+      <!-- File Explorer Container -->
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-xl flex-1 flex flex-col space-y-3">
+        
+        <!-- Quick Location Presets (Drives, Desktop, Downloads) -->
+        <div class="flex items-center gap-1.5 overflow-x-auto terminal-scroll pb-1 text-xs font-mono">
+          <span class="text-[11px] text-slate-400 font-sans font-medium shrink-0">Quick Folders:</span>
+          <button class="quick-dir-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 shrink-0" data-path="DRIVES">💽 Drives</button>
+          <button class="quick-dir-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 shrink-0" data-path="C:\">Local Disk (C:\)</button>
+          <button class="quick-dir-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0" data-path="C:\Users">Users</button>
+        </div>
+
+        <!-- Explorer Header & Path Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-800">
+          <div class="flex items-center space-x-2 flex-1 min-w-0">
+            <button id="fileUpBtn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-bold shrink-0" title="Parent Directory">
+              ⬆ ..
+            </button>
+            <input type="text" id="filePathInput" value="C:\" class="flex-1 bg-slate-950 font-mono text-xs text-emerald-400 px-3 py-1.5 rounded-lg border border-slate-800 focus:outline-none focus:border-emerald-500 truncate" />
+            <button id="fileGoBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-200 shrink-0">Go</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="uploadModalBtn" class="bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs px-3.5 py-1.5 rounded-lg font-mono flex items-center gap-1 shrink-0">
+              <span>+ Upload to PC</span>
+            </button>
+            <button id="refreshFilesBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-mono shrink-0">↻ Refresh</button>
+          </div>
+        </div>
+
+        <!-- Files List -->
+        <div class="overflow-x-auto flex-1 min-h-[380px] max-h-[520px] overflow-y-auto terminal-scroll rounded-lg border border-slate-800/80">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950 text-slate-400 sticky top-0">
+              <tr>
+                <th class="p-2.5">Name</th>
+                <th class="p-2.5">Size</th>
+                <th class="p-2.5">Modified</th>
+                <th class="p-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="filesTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr><td colspan="4" class="p-4 text-center text-slate-500">Connect to agent to explore and download remote files</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 3: HEALTH & PROCESS MANAGER                                -->
+    <!-- ============================================================== -->
+    <div id="tab-health" class="tab-content hidden flex-1 flex flex-col space-y-4">
+      
+      <!-- Gauges Overview -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div class="bg-dark-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <div class="text-xs text-slate-400 mb-1 flex justify-between">
+            <span>CPU Load</span>
+            <span id="cpuVal" class="text-emerald-400 font-mono font-bold">0%</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div id="cpuBar" class="bg-emerald-500 h-full w-0 transition-all duration-500"></div>
+          </div>
+        </div>
+
+        <div class="bg-dark-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <div class="text-xs text-slate-400 mb-1 flex justify-between">
+            <span>RAM Load</span>
+            <span id="ramVal" class="text-cyan-400 font-mono font-bold">0%</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div id="ramBar" class="bg-cyan-500 h-full w-0 transition-all duration-500"></div>
+          </div>
+        </div>
+
+        <div class="bg-dark-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <div class="text-xs text-slate-400 mb-1">RAM Memory</div>
+          <div id="ramUsedText" class="text-xs font-mono font-bold text-slate-200">-- / --</div>
+        </div>
+
+        <div class="bg-dark-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <div class="text-xs text-slate-400 mb-1">System Uptime</div>
+          <div id="uptimeText" class="text-xs font-mono font-bold text-slate-200">--</div>
+        </div>
+      </div>
+
+      <!-- Remote Power & Wake-on-LAN Control -->
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-lg space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Remote Power &amp; Wake-on-LAN
+          </h2>
+          <span class="text-[10px] text-indigo-300 bg-indigo-950/80 border border-indigo-800 px-2 py-0.5 rounded font-mono">Durable Cloud Queue Active</span>
+        </div>
+        <p class="text-xs text-slate-300">
+          When this laptop is turned off or asleep, commands submitted from mobile are safely queued in the cloud and execute automatically the instant the laptop powers on.
+        </p>
+        <div class="flex flex-col sm:flex-row items-center gap-2 pt-1">
+          <input type="text" id="wolMacInput" placeholder="Enter Laptop MAC (e.g. AA:BB:CC:DD:EE:FF)..." class="flex-1 bg-slate-950 text-xs px-3 py-2 rounded-lg border border-slate-800 font-mono text-emerald-400 w-full focus:outline-none focus:border-emerald-500" />
+          <button id="sendWolBtn" class="bg-amber-600 hover:bg-amber-500 text-black font-bold text-xs px-4 py-2 rounded-lg font-mono flex items-center gap-1 shrink-0 w-full sm:w-auto justify-center">
+            ⚡ Send Magic Packet (WoL)
+          </button>
+        </div>
+      </div>
+
+      <!-- Process Manager -->
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-xl flex-1 flex flex-col">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            Active Windows Processes
+          </h2>
+          <div class="flex items-center gap-2">
+            <input type="text" id="procSearchInput" placeholder="Filter processes..." class="bg-slate-950 text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500 font-mono" />
+            <button id="refreshProcBtn" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg font-mono text-slate-300">↻ Refresh</button>
+          </div>
+        </div>
+
+        <!-- Process Table -->
+        <div class="overflow-x-auto max-h-[380px] overflow-y-auto terminal-scroll rounded-lg border border-slate-800/80">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950 text-slate-400 sticky top-0">
+              <tr>
+                <th class="p-2.5">PID</th>
+                <th class="p-2.5">Name</th>
+                <th class="p-2.5">Memory (MB)</th>
+                <th class="p-2.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="procTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr><td colspan="4" class="p-4 text-center text-slate-500">Loading processes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 4: AUDIT LOGS                                              -->
+    <!-- ============================================================== -->
+    <div id="tab-audit" class="tab-content hidden flex-1 flex flex-col space-y-4">
+      
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-xl flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            Security &amp; Execution Audit Trail
+          </h2>
+          <button id="refreshAuditBtn" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg font-mono text-slate-300">↻ Refresh</button>
+        </div>
+
+        <div class="overflow-x-auto flex-1 max-h-[460px] overflow-y-auto terminal-scroll rounded-lg border border-slate-800/80">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950 text-slate-400 sticky top-0">
+              <tr>
+                <th class="p-2.5">Timestamp</th>
+                <th class="p-2.5">Action</th>
+                <th class="p-2.5">Details</th>
+                <th class="p-2.5">Status</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr><td colspan="4" class="p-4 text-center text-slate-500">No audit logs recorded</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4">
+      <h3 class="font-bold text-white text-sm">Upload File to Remote Machine</h3>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Target Directory / Path</label>
+        <input type="text" id="uploadDestPath" class="w-full bg-slate-950 font-mono text-xs text-emerald-400 p-2.5 rounded-lg border border-slate-800 focus:outline-none" />
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Choose File</label>
+        <input type="file" id="uploadFileInput" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-black cursor-pointer" />
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button id="cancelUploadBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300">Cancel</button>
+        <button id="submitUploadBtn" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold font-mono text-black">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur border-t border-slate-800 grid grid-cols-4 py-2 z-50 text-center font-medium text-[10px]">
+    <button onclick="switchTab('terminal')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="terminal">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+      <span>Terminal</span>
+    </button>
+    <button onclick="switchTab('files')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="files">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+      <span>Files</span>
+    </button>
+    <button onclick="switchTab('health')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="health">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+      <span>Health</span>
+    </button>
+    <button onclick="switchTab('audit')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="audit">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+      <span>Audit</span>
+    </button>
+  </nav>
+
+  <script>
+    // State
+    let ws = null;
+    let devices = {};
+    let selectedDeviceId = null;
+    let currentTab = 'terminal';
+    let cmdHistory = [];
+    let historyIdx = -1;
+    let currentPath = 'C:\\';
+
+    // Elements
+    const deviceSelector = document.getElementById('deviceSelector');
+    const relayDot = document.getElementById('relayStatusDot');
+    const relayText = document.getElementById('relayStatusText');
+    const terminalOutput = document.getElementById('terminalOutput');
+    const cmdInput = document.getElementById('cmdInput');
+    const commandForm = document.getElementById('commandForm');
+    const procTableBody = document.getElementById('procTableBody');
+    const filesTableBody = document.getElementById('filesTableBody');
+    const auditTableBody = document.getElementById('auditTableBody');
+    const filePathInput = document.getElementById('filePathInput');
+    const uploadModal = document.getElementById('uploadModal');
+
+    // Tab Switching
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      const activeEl = document.getElementById(`tab-${tabId}`);
+      if (activeEl) activeEl.classList.remove('hidden');
+
+      // Update Desktop Buttons
+      document.querySelectorAll('.tab-btn-desktop').forEach(btn => {
+        if (btn.dataset.tab === tabId) {
+          btn.className = 'tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 bg-slate-800 text-emerald-400 font-bold border border-slate-700';
+        } else {
+          btn.className = 'tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200';
+        }
+      });
+
+      // Update Mobile Buttons
+      document.querySelectorAll('.tab-btn-mobile').forEach(btn => {
+        if (btn.dataset.tab === tabId) {
+          btn.className = 'tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-emerald-400 font-bold';
+        } else {
+          btn.className = 'tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400';
+        }
+      });
+
+      if (tabId === 'health') loadProcesses();
+      if (tabId === 'files') loadFiles(currentPath);
+      if (tabId === 'audit') loadAuditLogs();
+    }
+
+    // Connect WebSocket
+    function connectWebSocket() {
+      const loc = window.location;
+      const wsProtocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${loc.host}/ws`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        relayDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        relayText.textContent = 'Relay Connected';
+        ws.send(JSON.stringify({
+          type: 'AUTH',
+          payload: { role: 'controller', token: '' }
+        }));
+        ws.send(JSON.stringify({ type: 'GET_DEVICES' }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const env = JSON.parse(event.data);
+          handleWebSocketMessage(env);
+        } catch (e) {
+          console.error("WS Parse Error", e);
+        }
+      };
+
+      ws.onclose = () => {
+        relayDot.className = 'w-2 h-2 rounded-full bg-red-400 animate-pulse';
+        relayText.textContent = 'Disconnected';
+        setTimeout(connectWebSocket, 3000);
+      };
+    }
+
+    function handleWebSocketMessage(env) {
+      switch (env.type) {
+        case 'DEVICE_LIST':
+          if (env.payload && env.payload.devices) {
+            env.payload.devices.forEach(d => { devices[d.deviceId] = d; });
+            populateDeviceSelector();
+          }
+          break;
+        case 'DEVICE_STATUS':
+          if (env.payload) {
+            const devId = env.payload.deviceId;
+            if (devices[devId]) devices[devId].status = env.payload.status;
+            else devices[devId] = { deviceId: devId, status: env.payload.status, metrics: {} };
+            populateDeviceSelector();
+          }
+          break;
+        case 'HEARTBEAT':
+          if (env.payload) {
+            const devId = env.payload.deviceId;
+            if (devices[devId]) {
+              devices[devId].metrics = env.payload.metrics;
+              devices[devId].status = 'ONLINE';
+              devices[devId].lastHeartbeat = Math.floor(Date.now()/1000);
+            }
+            populateDeviceSelector();
+          }
+          break;
+        case 'CMD_RESULT':
+          renderCommandResult(env.payload);
+          break;
+        case 'FILE_LIST_RESP':
+          renderFilesList(env.payload);
+          break;
+        case 'FILE_READ_RESP':
+          handleFileDownload(env.payload);
+          break;
+        case 'FILE_WRITE_RESP':
+          alert(env.payload.success ? "File uploaded successfully!" : "Upload failed: " + env.payload.error);
+          loadFiles(currentPath);
+          break;
+        case 'FILE_DELETE_RESP':
+          alert(env.payload.success ? "Deleted successfully" : "Delete failed: " + env.payload.error);
+          loadFiles(currentPath);
+          break;
+        case 'PROCESS_LIST_RESP':
+          renderProcessesList(env.payload);
+          break;
+        case 'PROCESS_KILL_RESP':
+          alert(env.payload.success ? `Process ${env.payload.pid} terminated` : `Kill failed: ${env.payload.error}`);
+          loadProcesses();
+          break;
+        case 'AUDIT_LOGS_LIST':
+          renderAuditLogsList(env.payload);
+          break;
+      }
+    }
+
+    function populateDeviceSelector() {
+      const devArray = Object.values(devices);
+      if (devArray.length === 0) {
+        deviceSelector.innerHTML = '<option value="">(No Devices)</option>';
+        return;
+      }
+
+      const prev = selectedDeviceId || devArray[0].deviceId;
+      deviceSelector.innerHTML = devArray.map(d => {
+        return `<option value="${d.deviceId}" ${d.deviceId === prev ? 'selected' : ''}>${d.deviceId} (${d.status || 'OFFLINE'})</option>`;
+      }).join('');
+
+      selectedDeviceId = deviceSelector.value;
+      updateHeaderStatus();
+      updateTelemetry();
+    }
+
+    deviceSelector.onchange = () => {
+      selectedDeviceId = deviceSelector.value;
+      updateHeaderStatus();
+      updateTelemetry();
+      if (currentTab === 'health') loadProcesses();
+      if (currentTab === 'files') loadFiles(currentPath);
+      if (currentTab === 'audit') loadAuditLogs();
+    };
+
+    function updateHeaderStatus() {
+      const d = devices[selectedDeviceId];
+      const dot = document.getElementById('activeDevStatusDot');
+      const title = document.getElementById('activeDevHeaderTitle');
+      if (!d) {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-600';
+        title.textContent = 'No device selected';
+        return;
+      }
+      title.textContent = `${d.deviceId} • ${d.hostname || 'Host'}`;
+      if (d.status === 'ONLINE') dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+      else if (d.status === 'DEGRADED') dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+      else dot.className = 'w-2 h-2 rounded-full bg-red-500';
+    }
+
+    function updateTelemetry() {
+      const d = devices[selectedDeviceId];
+      if (!d || !d.metrics) return;
+      const m = d.metrics;
+      const cpu = Math.round(m.cpuPercent || 0);
+      const ram = Math.round(m.ramPercent || 0);
+
+      document.getElementById('cpuVal').textContent = `${cpu}%`;
+      document.getElementById('cpuBar').style.width = `${Math.min(cpu, 100)}%`;
+
+      document.getElementById('ramVal').textContent = `${ram}%`;
+      document.getElementById('ramBar').style.width = `${Math.min(ram, 100)}%`;
+
+      const ramUsedMb = m.ramUsedBytes ? (m.ramUsedBytes / (1024*1024)).toFixed(0) : '--';
+      const ramTotalMb = m.ramTotalBytes ? (m.ramTotalBytes / (1024*1024)).toFixed(0) : '--';
+      document.getElementById('ramUsedText').textContent = `${ramUsedMb} MB / ${ramTotalMb} MB`;
+
+      const sec = m.uptimeSec || 0;
+      const h = Math.floor(sec / 3600);
+      const min = Math.floor((sec % 3600) / 60);
+      document.getElementById('uptimeText').textContent = `${h}h ${min}m`;
+    }
+
+    // Terminal
+    function appendConsole(text, colorClass = 'text-slate-200') {
+      const line = document.createElement('div');
+      line.className = colorClass;
+      line.textContent = text;
+      terminalOutput.appendChild(line);
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    function renderCommandResult(res) {
+      const box = document.createElement('div');
+      box.className = 'p-2.5 my-1.5 rounded-lg bg-slate-900 border ' + (res.exitCode === 0 ? 'border-emerald-800/60' : 'border-red-800/60');
+      const ts = new Date(res.executedAt * 1000).toLocaleTimeString();
+      const exitBadge = res.exitCode === 0 
+        ? '<span class="px-1 py-0.5 rounded bg-emerald-950 text-emerald-400 text-[10px] font-bold">Exit: 0</span>'
+        : `<span class="px-1 py-0.5 rounded bg-red-950 text-red-400 text-[10px] font-bold">Exit: ${res.exitCode}</span>`;
+
+      box.innerHTML = `
+        <div class="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-800 pb-1 mb-1.5 font-mono">
+          <span>Command: <code class="text-slate-200">${res.commandId.slice(0, 8)}</code></span>
+          <div class="flex items-center gap-2">
+            ${exitBadge}
+            <span>${ts}</span>
+          </div>
+        </div>
+        ${res.stdout ? `<pre class="text-emerald-300 font-mono text-xs whitespace-pre-wrap">${escapeHtml(res.stdout)}</pre>` : ''}
+        ${res.stderr ? `<pre class="text-red-400 font-mono text-xs whitespace-pre-wrap mt-1">${escapeHtml(res.stderr)}</pre>` : ''}
+      `;
+      terminalOutput.appendChild(box);
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    function executeCommand(cmd) {
+      if (!cmd) return;
+      if (!selectedDeviceId) {
+        alert("Please select a target device first.");
+        return;
+      }
+      cmdHistory.push(cmd);
+      historyIdx = cmdHistory.length;
+      appendConsole(`PS [${selectedDeviceId}]> ${cmd}`, 'text-emerald-400 font-bold mt-1');
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'ENQUEUE_CMD',
+          payload: { deviceId: selectedDeviceId, command: cmd, timeoutSec: 60 }
+        }));
+      }
+    }
+
+    commandForm.onsubmit = (e) => {
+      e.preventDefault();
+      const cmd = cmdInput.value.trim();
+      cmdInput.value = '';
+      executeCommand(cmd);
+    };
+
+    // Predefined buttons
+    document.querySelectorAll('.predef-btn, .preset-btn').forEach(btn => {
+      btn.onclick = () => {
+        executeCommand(btn.dataset.cmd);
+      };
+    });
+
+    document.getElementById('togglePredefBtn').onclick = () => {
+      const grid = document.getElementById('predefGrid');
+      grid.classList.toggle('hidden');
+    };
+
+    // Touch toolbar
+    document.querySelectorAll('.touch-key').forEach(btn => {
+      btn.onclick = () => {
+        const k = btn.dataset.key;
+        if (k === 'Up') {
+          if (historyIdx > 0) { historyIdx--; cmdInput.value = cmdHistory[historyIdx] || ''; }
+        } else if (k === 'Down') {
+          if (historyIdx < cmdHistory.length - 1) { historyIdx++; cmdInput.value = cmdHistory[historyIdx] || ''; }
+          else { historyIdx = cmdHistory.length; cmdInput.value = ''; }
+        } else {
+          cmdInput.value += k;
+          cmdInput.focus();
+        }
+      };
+    });
+
+    document.getElementById('clearConsoleBtn').onclick = () => {
+      terminalOutput.innerHTML = '<div class="text-slate-500 text-[11px]">[Console cleared]</div>';
+    };
+
+    // Remote File Manager
+    function loadFiles(path) {
+      if (!selectedDeviceId || !ws || ws.readyState !== WebSocket.OPEN) return;
+      currentPath = path;
+      filePathInput.value = path;
+      filesTableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">Reading directory...</td></tr>';
+      ws.send(JSON.stringify({
+        type: 'FILE_LIST_REQ',
+        deviceId: selectedDeviceId,
+        payload: { deviceId: selectedDeviceId, path: path }
+      }));
+    }
+
+    function renderFilesList(payload) {
+      if (payload.error) {
+        filesTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error: ${payload.error}</td></tr>`;
+        return;
+      }
+      currentPath = payload.path || currentPath;
+      filePathInput.value = currentPath;
+      const list = payload.files || [];
+
+      if (list.length === 0) {
+        filesTableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">Directory is empty</td></tr>';
+        return;
+      }
+
+      filesTableBody.innerHTML = list.map(f => {
+        const icon = f.isDir ? '📁' : '📄';
+        const sizeStr = f.isDir ? '--' : formatBytes(f.sizeBytes);
+        const modStr = f.modTime ? new Date(f.modTime * 1000).toLocaleDateString() : '--';
+
+        return `
+          <tr class="hover:bg-slate-900/60">
+            <td class="p-2.5 flex items-center gap-2 cursor-pointer ${f.isDir ? 'text-emerald-400 font-bold' : 'text-slate-200'}" onclick="${f.isDir ? `loadFiles('${escapeJsStr(f.path)}')` : `downloadFile('${escapeJsStr(f.path)}')`}">
+              <span>${icon}</span>
+              <span class="truncate max-w-[180px] sm:max-w-[320px]">${f.name}</span>
+            </td>
+            <td class="p-2.5 text-slate-400">${sizeStr}</td>
+            <td class="p-2.5 text-slate-500 text-[11px]">${modStr}</td>
+            <td class="p-2.5 text-right space-x-1.5">
+              ${!f.isDir ? `
+                <button onclick="downloadFile('${escapeJsStr(f.path)}')" class="px-2.5 py-1 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-400 border border-cyan-800 text-[10px] font-bold">
+                  ⬇ Download
+                </button>
+              ` : `
+                <button onclick="loadFiles('${escapeJsStr(f.path)}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[10px]">
+                  Open
+                </button>
+              `}
+              <button onclick="deleteFile('${escapeJsStr(f.path)}', '${escapeHtml(f.name)}')" class="px-2 py-0.5 rounded bg-red-950 hover:bg-red-900 text-red-400 text-[10px] font-bold">
+                Del
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function downloadFile(path) {
+      if (!selectedDeviceId) return;
+      appendConsole(`[Download] Requesting file ${path}...`, 'text-cyan-400');
+      ws.send(JSON.stringify({
+        type: 'FILE_READ_REQ',
+        deviceId: selectedDeviceId,
+        payload: { deviceId: selectedDeviceId, path: path }
+      }));
+    }
+
+    function handleFileDownload(payload) {
+      if (payload.error) {
+        alert("Download error: " + payload.error);
+        return;
+      }
+      try {
+        const raw = atob(payload.contentBase64);
+        const u8 = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+        const blob = new Blob([u8], { type: 'application/octet-stream' });
+        const filename = payload.path.split(/[\\/]/).pop() || 'download';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        appendConsole(`[Download Complete] Saved ${filename} (${formatBytes(payload.sizeBytes)}) to your mobile device!`, 'text-emerald-400');
+      } catch (e) {
+        alert("Error saving downloaded file: " + e.message);
+      }
+    }
+
+    function deleteFile(path, name) {
+      if (!confirm(`Delete ${name}?`)) return;
+      ws.send(JSON.stringify({
+        type: 'FILE_DELETE_REQ',
+        deviceId: selectedDeviceId,
+        payload: { deviceId: selectedDeviceId, path: path }
+      }));
+    }
+
+    document.querySelectorAll('.quick-dir-btn').forEach(btn => {
+      btn.onclick = () => {
+        loadFiles(btn.dataset.path);
+      };
+    });
+
+    document.getElementById('fileUpBtn').onclick = () => {
+      if (currentPath === 'DRIVES' || currentPath === 'C:\\' || currentPath === 'C:/') {
+        loadFiles('DRIVES');
+        return;
+      }
+      let parts = currentPath.split(/[\\/]/).filter(Boolean);
+      if (parts.length <= 1) {
+        loadFiles('DRIVES');
+      } else {
+        parts.pop();
+        loadFiles(parts.join('\\') + '\\');
+      }
+    };
+
+    document.getElementById('fileGoBtn').onclick = () => {
+      loadFiles(filePathInput.value.trim());
+    };
+
+    document.getElementById('refreshFilesBtn').onclick = () => {
+      loadFiles(currentPath);
+    };
+
+    // Upload Modal
+    document.getElementById('uploadModalBtn').onclick = () => {
+      document.getElementById('uploadDestPath').value = currentPath;
+      uploadModal.classList.remove('hidden');
+    };
+
+    document.getElementById('cancelUploadBtn').onclick = () => {
+      uploadModal.classList.add('hidden');
+    };
+
+    document.getElementById('submitUploadBtn').onclick = () => {
+      const fileInput = document.getElementById('uploadFileInput');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Please select a file first.");
+        return;
+      }
+      const file = fileInput.files[0];
+      const destDir = document.getElementById('uploadDestPath').value.trim();
+      const destPath = destDir.endsWith('\\') ? destDir + file.name : destDir + '\\' + file.name;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Content = reader.result.split(',')[1];
+        ws.send(JSON.stringify({
+          type: 'FILE_WRITE_REQ',
+          deviceId: selectedDeviceId,
+          payload: {
+            deviceId: selectedDeviceId,
+            path: destPath,
+            contentBase64: base64Content,
+            overwrite: true
+          }
+        }));
+        uploadModal.classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // Process Manager
+    function loadProcesses() {
+      if (!selectedDeviceId || !ws || ws.readyState !== WebSocket.OPEN) return;
+      procTableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">Querying processes...</td></tr>';
+      ws.send(JSON.stringify({
+        type: 'PROCESS_LIST_REQ',
+        deviceId: selectedDeviceId,
+        payload: { deviceId: selectedDeviceId }
+      }));
+    }
+
+    function renderProcessesList(payload) {
+      if (payload.error) {
+        procTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error: ${payload.error}</td></tr>`;
+        return;
+      }
+      const list = payload.processes || [];
+      const filter = (document.getElementById('procSearchInput').value || '').toLowerCase();
+      const filtered = list.filter(p => p.name.toLowerCase().includes(filter));
+
+      if (filtered.length === 0) {
+        procTableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">No matching processes found</td></tr>';
+        return;
+      }
+
+      procTableBody.innerHTML = filtered.map(p => `
+        <tr class="hover:bg-slate-900/60">
+          <td class="p-2.5 text-slate-400">${p.pid}</td>
+          <td class="p-2.5 font-bold text-white">${p.name}</td>
+          <td class="p-2.5 text-cyan-400 font-bold">${p.memoryMb.toFixed(1)} MB</td>
+          <td class="p-2.5 text-right">
+            <button onclick="killProcess(${p.pid}, '${escapeHtml(p.name)}')" class="bg-red-950 hover:bg-red-900 text-red-400 border border-red-800 px-2 py-0.5 rounded text-[10px] font-bold">
+              Kill
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function killProcess(pid, name) {
+      if (!confirm(`Are you sure you want to terminate process ${name} (PID: ${pid})?`)) return;
+      ws.send(JSON.stringify({
+        type: 'PROCESS_KILL_REQ',
+        deviceId: selectedDeviceId,
+        payload: { deviceId: selectedDeviceId, pid: pid }
+      }));
+    }
+
+    document.getElementById('refreshProcBtn').onclick = loadProcesses;
+    document.getElementById('procSearchInput').oninput = () => {
+      loadProcesses();
+    };
+
+    // Audit Logs
+    async function loadAuditLogs() {
+      try {
+        const res = await fetch(`/api/audit?deviceId=${selectedDeviceId || ''}&limit=50`);
+        const logs = await res.json();
+        renderAuditLogsList({ logs: logs });
+      } catch (e) {
+        console.error("Failed to load audit logs", e);
+      }
+    }
+
+    function renderAuditLogsList(payload) {
+      const logs = payload.logs || [];
+      if (logs.length === 0) {
+        auditTableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">No audit logs recorded</td></tr>';
+        return;
+      }
+
+      auditTableBody.innerHTML = logs.map(l => {
+        const ts = new Date(l.timestamp * 1000).toLocaleString();
+        let actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">ACTION</span>';
+        if (l.actionType === 'EXEC_CMD') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800">EXEC_CMD</span>';
+        else if (l.actionType === 'CLOUD_EXEC') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-400 border border-indigo-800">CLOUD_EXEC</span>';
+        else if (l.actionType === 'FILE_WRITE') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800">FILE_WRITE</span>';
+        else if (l.actionType === 'FILE_DELETE') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-400 border border-red-800">FILE_DELETE</span>';
+        else if (l.actionType === 'PROCESS_KILL') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-400 border border-amber-800">PROCESS_KILL</span>';
+
+        return `
+          <tr class="hover:bg-slate-900/60">
+            <td class="p-2.5 text-slate-400 text-[11px]">${ts}</td>
+            <td class="p-2.5">${actionBadge}</td>
+            <td class="p-2.5 text-slate-200 max-w-[240px] truncate" title="${escapeHtml(l.commandText)}">${escapeHtml(l.commandText)}</td>
+            <td class="p-2.5 text-slate-400">${l.exitCode === 0 ? '✓' : `Exit: ${l.exitCode}`}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('refreshAuditBtn').onclick = loadAuditLogs;
+
+    // Wake-on-LAN
+    document.getElementById('sendWolBtn').onclick = async () => {
+      const mac = document.getElementById('wolMacInput').value.trim();
+      if (!mac) {
+        alert("Please enter the target machine's MAC address.");
+        return;
+      }
+      try {
+        const res = await fetch('/api/wol', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ macAddress: mac })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`⚡ Magic Packet broadcast to ${data.broadcast} for MAC: ${data.macAddress}`);
+        } else {
+          alert("WoL error: " + (data.error || "failed"));
+        }
+      } catch (e) {
+        alert("WoL request failed: " + e.message);
+      }
+    };
+
+    // Helpers
+    function formatBytes(b) {
+      if (!b || b === 0) return '0 B';
+      if (b < 1024) return b + ' B';
+      if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+      if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
+      return (b/(1024*1024*1024)).toFixed(1) + ' GB';
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function escapeJsStr(str) {
+      return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    // Initialize
+    connectWebSocket();
+    switchTab('terminal');
+  </script>
+</body>
+</html>
