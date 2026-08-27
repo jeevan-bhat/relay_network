@@ -80,6 +80,7 @@ $configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Enc
 Write-Host "[✓] Configuration saved to $configPath" -ForegroundColor Green
 
 # 5. Stop and uninstall any old service version
+Stop-Process -Name "terminal-agent" -Force -ErrorAction SilentlyContinue
 if (Get-Service -Name "TerminalAgent" -ErrorAction SilentlyContinue) {
     Write-Host "Updating existing TerminalAgent service..." -ForegroundColor Gray
     Stop-Service -Name "TerminalAgent" -Force -ErrorAction SilentlyContinue
@@ -95,11 +96,23 @@ Write-Host "[✓] Installed executable to $destExe" -ForegroundColor Green
 
 # 7. Register and Start Service via Windows SCM
 Write-Host "Installing Windows Service (Automatic Startup on Boot)..." -ForegroundColor Yellow
-& $destExe install
 
-# Ensure service starts automatically on system boot
+try {
+    Start-Process -FilePath "$destExe" -ArgumentList "install" -Wait -NoNewWindow -ErrorAction SilentlyContinue
+} catch {}
+
+# Fallback: create directly via sc.exe if not registered
+$svcCheck = Get-Service -Name "TerminalAgent" -ErrorAction SilentlyContinue
+if (-not $svcCheck) {
+    sc.exe create TerminalAgent binPath= "`"$destExe`"" start= auto DisplayName= "Terminal Agent" | Out-Null
+}
+
 sc.exe config TerminalAgent start= auto | Out-Null
-& $destExe start
+
+try {
+    Start-Process -FilePath "$destExe" -ArgumentList "start" -Wait -NoNewWindow -ErrorAction SilentlyContinue
+} catch {}
+Start-Service -Name "TerminalAgent" -ErrorAction SilentlyContinue
 
 Start-Sleep -Seconds 2
 
