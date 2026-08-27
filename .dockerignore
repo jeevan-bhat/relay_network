@@ -1,0 +1,10 @@
+agent/
+scripts/
+.git/
+.gitignore
+*.exe
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+agent.log

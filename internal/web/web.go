@@ -35,6 +35,18 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", s.hub.HandleWS)
 
+	// Health check endpoints for cloud load balancers (Render, Fly.io, Kubernetes)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
 	// REST API
 	mux.HandleFunc("/api/devices", s.handleDevices)
 	mux.HandleFunc("/api/commands", s.handleCommands)
