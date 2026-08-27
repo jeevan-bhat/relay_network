@@ -69,16 +69,14 @@ Write-Host ""
 Write-Host "Connecting device '$deviceID' to '$relayURL'..." -ForegroundColor Cyan
 
 # 4. Write Persistent Config
-$configJson = @"
-{
-    "relay_url": "$relayURL",
-    "device_id": "$deviceID",
-    "db_path": "C:\\ProgramData\\TerminalAgent\\queue.db",
-    "heartbeat_interval": "15s"
+$configObj = [PSCustomObject]@{
+    relay_url          = $relayURL
+    device_id          = $deviceID
+    db_path            = "C:\ProgramData\TerminalAgent\queue.db"
+    heartbeat_interval = "15s"
 }
-"@
 $configPath = Join-Path $agentDir "config.json"
-Set-Content -Path $configPath -Value $configJson -Force
+$configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8
 Write-Host "[✓] Configuration saved to $configPath" -ForegroundColor Green
 
 # 5. Stop and uninstall any old service version
