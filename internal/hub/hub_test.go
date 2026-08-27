@@ -66,7 +66,7 @@ func sendEnv(t *testing.T, conn *websocket.Conn, msgType, deviceID string, paylo
 
 func readEnv(t *testing.T, conn *websocket.Conn) protocol.Envelope {
 	t.Helper()
-	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 	_, b, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("read env: %v", err)

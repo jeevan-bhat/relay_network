@@ -18,10 +18,8 @@ func X__ccgo_sqlite3_log(t *libc.TLS, iErrCode int32, zFormat uintptr, va uintpt
 
 // https://gitlab.com/cznic/sqlite/-/issues/199
 //
-// The transpiled getpagesize entry of _aSyscall does not report the kernel page
-// size on linux/arm64, so SQLite misaligns the mmap of its WAL shm regions on a
-// 64 KB page kernel and reports a disk I/O error. Substitute a Go implementation
-// at run time; sqlite.go calls this from its init.
+// We are currently stuck on libc@v1.55.3. Until that is resolved - fix the
+// problem at runtime.
 func PatchIssue199() {
 	p := unsafe.Pointer(&_aSyscall)
 	*(*uintptr)(unsafe.Add(p, 608)) = __ccgo_fp(_unixGetpagesizeIssue199)

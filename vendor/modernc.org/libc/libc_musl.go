@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build linux && (amd64 || arm64 || loong64 || ppc64le || s390x || riscv64 || 386 || arm)
+//go:build linux && (amd64 || arm64 || loong64)
 
 //go:generate go run generator.go
 
@@ -15,7 +15,7 @@
 // have generated some Go code from C you should stick to the version of this
 // package that you used at that time and was tested with your payload. The
 // correct way to upgrade to a newer version of this package is to first
-// recompile (C to Go) your code with a newer version of ccgo that depends on
+// recompile (C to Go) your code with a newwer version if ccgo that depends on
 // the new libc version.
 //
 // If you use C to Go translated code provided by others, stick to the version
@@ -119,7 +119,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
+	"syscall"
 	"unsafe"
 
 	guuid "github.com/google/uuid"
@@ -157,7 +157,6 @@ func init() {
 
 	Xprogram_invocation_name = mustCString(nm)
 	Xprogram_invocation_short_name = mustCString(filepath.Base(nm))
-	X__libc.Fpage_size = Tsize_t(os.Getpagesize())
 }
 
 // RawMem64 represents the biggest uint64 array the runtime can handle.
@@ -229,6 +228,29 @@ func CString(s string) (uintptr, error) {
 	return p, nil
 }
 
+// GoBytes returns a byte slice from a C char* having length len bytes.
+func GoBytes(s uintptr, len int) []byte {
+	return unsafe.Slice((*byte)(unsafe.Pointer(s)), len)
+}
+
+// GoString returns the value of a C string at s.
+func GoString(s uintptr) string {
+	if s == 0 {
+		return ""
+	}
+
+	var buf []byte
+	for {
+		b := *(*byte)(unsafe.Pointer(s))
+		if b == 0 {
+			return string(buf)
+		}
+
+		buf = append(buf, b)
+		s++
+	}
+}
+
 func mustMalloc(sz Tsize_t) (r uintptr) {
 	if r = Xmalloc(nil, sz); r != 0 || sz == 0 {
 		return r
@@ -294,11 +316,6 @@ func NewTLS() (r *TLS) {
 		pthread:     pthread,
 		sigHandlers: map[int32]uintptr{},
 	}
-}
-
-// StackSlots reports the number of tls stack slots currently in use.
-func (tls *TLS) StackSlots() int {
-	return tls.sp
 }
 
 // int *__errno_location(void)
@@ -397,7 +414,7 @@ func (tls *TLS) Free(n int) {
 
 	select {
 	case sig := <-tls.pendingSignals:
-		signum := int32(sig.(unix.Signal))
+		signum := int32(sig.(syscall.Signal))
 		h, ok := tls.sigHandlers[signum]
 		if !ok {
 			break
@@ -482,12 +499,11 @@ func (tls *TLS) Longjmp(jb uintptr, val int32) {
 func Xexit(tls *TLS, code int32) {
 	//TODO atexit finalizers
 	X__stdio_exit(tls)
-	for i := len(atExit) - 1; i >= 0; i-- {
-		atExit[i]()
+	for _, v := range atExit {
+		v()
 	}
 	atExitHandlersMu.Lock()
-	for i := len(atExitHandlers) - 1; i >= 0; i-- {
-		v := atExitHandlers[i]
+	for _, v := range atExitHandlers {
 		(*(*func(*TLS))(unsafe.Pointer(&struct{ uintptr }{v})))(tls)
 	}
 	os.Exit(int(code))
@@ -501,113 +517,71 @@ var abort Tsigaction
 
 func Xabort(tls *TLS) {
 	X__libc_sigaction(tls, SIGABRT, uintptr(unsafe.Pointer(&abort)), 0)
-	unix.Kill(unix.Getpid(), unix.Signal(SIGABRT))
+	unix.Kill(unix.Getpid(), syscall.Signal(SIGABRT))
 	panic(todo("unrechable"))
 }
 
-// States of the C lock word *p, as in musl's __lock/__unlock.
-const (
-	lockFree      = 0 // Nobody holds the lock.
-	lockHeld      = 1 // Held, no waiter has parked.
-	lockContended = 2 // Held, a waiter may be parked.
-)
-
-// ___lock/___unlock emulate musl's __lock/__unlock, a mutual-exclusion lock over
-// the opaque C lock word *p.
-//
-// All lock state lives in *p, exactly as it does in musl. That is a correctness
-// requirement, not just fidelity to upstream: a caller may free the memory
-// holding the word while the lock is held and never unlock it. musl's
-// freeaddrinfo does precisely that, dropping the last aibuf reference under
-// LOCK(b->lock) and calling free(b) instead of UNLOCK(b->lock). In C the state
-// dies with the block, so a recycled, zero-initialized block starts out
-// unlocked. Every lock word reachable here is either a zeroed package-level var
-// or lives in Xcalloc'd memory, so that holds here too.
-//
-// Blocking uses a parking lot keyed by the word's address, standing in for the
-// futex musl waits on. lockWait re-checks *p under lockParkMu, and ___unlock
-// stores to *p before lockWake takes lockParkMu, so a release landing before the
-// waiter parks is observed as a value change instead of being lost. Parking lot
-// entries exist only while a goroutine is actually parked, so a lock abandoned
-// with no waiter leaves nothing behind.
-//
-// Two earlier implementations each satisfied one half of that. The first kept an
-// atomic fast path on *p plus a throwaway hand-off object in a map and lost
-// wakeups when an unlocker reached the map before a contending locker had
-// registered there (cznic/libc#51). The second moved all state into a
-// process-global map keyed on the address, which made freeaddrinfo's abandoned
-// lock permanent: the entry outlived the free, still locked, and the next caller
-// handed that address wedged at zero CPU.
-
-func ___lock(tls *TLS, p uintptr) {
-	w := (*int32)(unsafe.Pointer(p))
-	if atomic.CompareAndSwapInt32(w, lockFree, lockHeld) {
-		return // Uncontended.
-	}
-
-	// Some other C thread holds p. The swap claims the lock if it turns out to be
-	// free and otherwise records that its holder owes us a wake.
-	for atomic.SwapInt32(w, lockContended) != lockFree {
-		lockWait(p, lockContended)
-	}
-}
-
-func ___unlock(tls *TLS, p uintptr) {
-	if atomic.SwapInt32((*int32)(unsafe.Pointer(p)), lockFree) == lockContended {
-		lockWake(p)
-	}
-}
-
-// lockPark collects the goroutines parked on one lock word address.
-type lockPark struct {
-	cond    sync.Cond
+type lock struct {
+	sync.Mutex
 	waiters int
 }
 
 var (
-	lockParkMu sync.Mutex
-	lockParked = map[uintptr]*lockPark{}
+	locksMu sync.Mutex
+	locks   = map[uintptr]*lock{}
 )
 
-// lockWait parks the calling goroutine while *p is still val, standing in for
-// musl's __futexwait.
-func lockWait(p uintptr, val int32) {
-	lockParkMu.Lock()
+/*
 
-	defer lockParkMu.Unlock()
+	T1		T2
 
-	// Re-check under lockParkMu: ___unlock stores to *p before lockWake takes
-	// lockParkMu, so a wake that would otherwise be delivered before we park shows
-	// up here as a changed value.
-	if atomic.LoadInt32((*int32)(unsafe.Pointer(p))) != val {
+	lock(&foo)			// foo: 0 -> 1
+
+			lock(&foo)	// foo: 1 -> 2
+
+	unlock(&foo)			// foo: 2 -> 1, non zero means waiter(s) active
+
+			unlock(&foo)	// foo: 1 -> 0
+
+*/
+
+func ___lock(tls *TLS, p uintptr) {
+	if atomic.AddInt32((*int32)(unsafe.Pointer(p)), 1) == 1 {
 		return
 	}
 
-	q := lockParked[p]
-	if q == nil {
-		q = &lockPark{}
-		q.cond.L = &lockParkMu
-		lockParked[p] = q
+	// foo was already acquired by some other C thread.
+	locksMu.Lock()
+	l := locks[p]
+	if l == nil {
+		l = &lock{}
+		locks[p] = l
+		l.Lock()
 	}
-	q.waiters++
-	q.cond.Wait()
-	q.waiters--
-	if q.waiters == 0 {
-		delete(lockParked, p)
-	}
+	l.waiters++
+	locksMu.Unlock()
+	l.Lock() // Wait for T1 to release foo. (X below)
 }
 
-// lockWake releases one goroutine parked on p, if any, standing in for musl's
-// __wake. Waking one suffices: whoever wakes either acquires p, and then owes
-// the next wake when it unlocks, or re-marks p contended before parking again.
-func lockWake(p uintptr) {
-	lockParkMu.Lock()
-
-	defer lockParkMu.Unlock()
-
-	if q := lockParked[p]; q != nil {
-		q.cond.Signal()
+func ___unlock(tls *TLS, p uintptr) {
+	if atomic.AddInt32((*int32)(unsafe.Pointer(p)), -1) == 0 {
+		return
 	}
+
+	// Some other C thread is waiting for foo.
+	locksMu.Lock()
+	l := locks[p]
+	if l == nil {
+		// We are T1 and we got the locksMu locked before T2.
+		l = &lock{waiters: 1}
+		l.Lock()
+	}
+	l.Unlock() // Release foo, T2 may now lock it. (X above)
+	l.waiters--
+	if l.waiters == 0 { // we are T2
+		delete(locks, p)
+	}
+	locksMu.Unlock()
 }
 
 type lockedFile struct {
@@ -665,56 +639,16 @@ func ___synccall(tls *TLS, fn, ctx uintptr) {
 	(*(*func(*TLS, uintptr))(unsafe.Pointer(&struct{ uintptr }{fn})))(tls, ctx)
 }
 
-// func ___randname(tls *TLS, template uintptr) (r1 uintptr) {
-// 	bp := tls.Alloc(16)
-// 	defer tls.Free(16)
-// 	var i int32
-// 	var r uint64
-// 	var _ /* ts at bp+0 */ Ttimespec
-// 	X__clock_gettime(tls, CLOCK_REALTIME, bp)
-// 	goto _2
-// _2:
-// 	r = uint64((*(*Ttimespec)(unsafe.Pointer(bp))).Ftv_sec+(*(*Ttimespec)(unsafe.Pointer(bp))).Ftv_nsec) + uint64(tls.ID)*uint64(65537)
-// 	i = 0
-// 	for {
-// 		if !(i < int32(6)) {
-// 			break
-// 		}
-// 		*(*int8)(unsafe.Pointer(template + uintptr(i))) = int8(uint64('A') + r&uint64(15) + r&uint64(16)*uint64(2))
-// 		goto _3
-// 	_3:
-// 		i++
-// 		r >>= uint64(5)
-// 	}
-// 	return template
-// }
-
-// #include <time.h>
-// #include <stdint.h>
-// #include "pthread_impl.h"
-//
-// /* This assumes that a check for the
-//
-//	template size has already been made */
-//
-// char *__randname(char *template)
-//
-//	{
-//		int i;
-//		struct timespec ts;
-//		unsigned long r;
-//
-//		__clock_gettime(CLOCK_REALTIME, &ts);
-//		r = ts.tv_sec + ts.tv_nsec + __pthread_self()->tid * 65537UL;
-//		for (i=0; i<6; i++, r>>=5)
-//			template[i] = 'A'+(r&15)+(r&16)*2;
-//
-//		return template;
-//	}
 func ___randname(tls *TLS, template uintptr) (r1 uintptr) {
+	bp := tls.Alloc(16)
+	defer tls.Free(16)
 	var i int32
-	ts := time.Now().UnixNano()
-	r := uint64(ts) + uint64(tls.ID)*65537
+	var r uint64
+	var _ /* ts at bp+0 */ Ttimespec
+	X__clock_gettime(tls, CLOCK_REALTIME, bp)
+	goto _2
+_2:
+	r = uint64((*(*Ttimespec)(unsafe.Pointer(bp))).Ftv_sec+(*(*Ttimespec)(unsafe.Pointer(bp))).Ftv_nsec) + uint64(tls.ID)*uint64(65537)
 	i = 0
 	for {
 		if !(i < int32(6)) {
@@ -748,15 +682,15 @@ func Xsignal(tls *TLS, signum int32, handler uintptr) (r uintptr) {
 	r, tls.sigHandlers[signum] = tls.sigHandlers[signum], handler
 	switch handler {
 	case SIG_DFL:
-		gosignal.Reset(unix.Signal(signum))
+		gosignal.Reset(syscall.Signal(signum))
 	case SIG_IGN:
-		gosignal.Ignore(unix.Signal(signum))
+		gosignal.Ignore(syscall.Signal(signum))
 	default:
 		if tls.pendingSignals == nil {
 			tls.pendingSignals = make(chan os.Signal, 3)
 			tls.checkSignals = true
 		}
-		gosignal.Notify(tls.pendingSignals, unix.Signal(signum))
+		gosignal.Notify(tls.pendingSignals, syscall.Signal(signum))
 	}
 	return r
 }
@@ -1112,6 +1046,7 @@ func Xsysctlbyname(t *TLS, name, oldp, oldlenp, newp uintptr, newlen Tsize_t) in
 		*(*int32)(unsafe.Pointer(oldp)) = int32(runtime.GOMAXPROCS(-1))
 		return 0
 	default:
+		panic(todo(""))
 		t.setErrno(ENOENT)
 		return -1
 	}
