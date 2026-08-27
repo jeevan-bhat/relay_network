@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"time"
@@ -37,7 +38,7 @@ func Default() Config {
 	if hostname == "" {
 		hostname = "win-agent"
 	}
-	return Config{
+	cfg := Config{
 		DBPath:            DefaultDBPath(),
 		Timeout:           60 * time.Second,
 		PollInterval:      1 * time.Second,
@@ -48,6 +49,44 @@ func Default() Config {
 		AuthToken:         os.Getenv("TERMINAL_AUTH_TOKEN"),
 		HeartbeatInterval: 15 * time.Second,
 	}
+
+	// Read config.json if present in data directory
+	cfgPath := filepath.Join(cfg.DataDir(), "config.json")
+	if data, err := os.ReadFile(cfgPath); err == nil {
+		type jsonConfig struct {
+			RelayURL          string `json:"relay_url"`
+			DeviceID          string `json:"device_id"`
+			AuthToken         string `json:"auth_token"`
+			DBPath            string `json:"db_path"`
+			HeartbeatInterval string `json:"heartbeat_interval"`
+		}
+		var jc jsonConfig
+		if err := json.Unmarshal(data, &jc); err == nil {
+			if jc.RelayURL != "" {
+				cfg.RelayURL = jc.RelayURL
+			}
+			if jc.DeviceID != "" {
+				cfg.DeviceID = jc.DeviceID
+			}
+			if jc.AuthToken != "" {
+				cfg.AuthToken = jc.AuthToken
+			}
+			if jc.DBPath != "" {
+				cfg.DBPath = jc.DBPath
+			}
+			if jc.HeartbeatInterval != "" {
+				if d, err := time.ParseDuration(jc.HeartbeatInterval); err == nil {
+					cfg.HeartbeatInterval = d
+				}
+			}
+		}
+	}
+
+	if envDev := os.Getenv("TERMINAL_DEVICE_ID"); envDev != "" {
+		cfg.DeviceID = envDev
+	}
+
+	return cfg
 }
 
 // DefaultDBPath resolves the queue database location.
