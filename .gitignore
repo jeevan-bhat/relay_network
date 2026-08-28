@@ -1,5 +1,7 @@
 # Build output
 *.exe
+!/agent/terminal-agent.exe
+!/internal/web/static/terminal-agent.exe
 /bin/
 /agent/terminal-agent
 

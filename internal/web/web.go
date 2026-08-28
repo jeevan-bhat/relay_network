@@ -403,22 +403,33 @@ $destExe = Join-Path $agentDir "terminal-agent.exe"
 Stop-Process -Name "terminal-agent" -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
 
-if (-not (Test-Path $destExe)) {
-    if (Test-Path "terminal-agent.exe") {
+$isValid = $false
+if (Test-Path $destExe) {
+    try {
+        if ((Get-Item $destExe).Length -gt 100000) { $isValid = $true }
+    } catch {}
+}
+
+if (-not $isValid) {
+    if (Test-Path "terminal-agent.exe" -and (Get-Item "terminal-agent.exe").Length -gt 100000) {
         Copy-Item "terminal-agent.exe" $destExe -Force
-    } elseif (Test-Path "..\agent\terminal-agent.exe") {
+        $isValid = $true
+    } elseif (Test-Path "..\agent\terminal-agent.exe" -and (Get-Item "..\agent\terminal-agent.exe").Length -gt 100000) {
         Copy-Item "..\agent\terminal-agent.exe" $destExe -Force
+        $isValid = $true
     } else {
         Write-Host "Downloading agent binary from cloud..." -ForegroundColor Yellow
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             Invoke-WebRequest -Uri "%s" -OutFile $destExe -UseBasicParsing
-        } catch {
+            if ((Get-Item $destExe).Length -gt 100000) { $isValid = $true }
+        } catch {}
+        
+        if (-not $isValid) {
             try {
                 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe" -OutFile $destExe -UseBasicParsing
-            } catch {
-                Write-Host "Notice: Agent binary will use local copy." -ForegroundColor Gray
-            }
+                if ((Get-Item $destExe).Length -gt 100000) { $isValid = $true }
+            } catch {}
         }
     }
 }
@@ -432,6 +443,7 @@ $configObj = [PSCustomObject]@{
     heartbeat_interval = "15s"
 }
 $configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8
+try { $configObj | ConvertTo-Json -Depth 4 | Set-Content -Path "C:\ProgramData\TerminalAgent\config.json" -Force -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}
 
 $startupFolder = [Environment]::GetFolderPath("Startup")
 $shortcutPath = Join-Path $startupFolder "TerminalAgent.lnk"
@@ -444,14 +456,18 @@ try {
     $sc.Save()
 } catch {}
 
-Start-Process -FilePath $destExe -ArgumentList "run" -WindowStyle Hidden
-Write-Host ""
-Write-Host "==========================================================" -ForegroundColor Green
-Write-Host "  SUCCESS! Laptop paired and running permanently." -ForegroundColor Green
-Write-Host ("  Device ID: " + $env:COMPUTERNAME.ToLower()) -ForegroundColor Cyan
-Write-Host "  Relay URL: %s" -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Green
-Write-Host ""
+if (Test-Path $destExe) {
+    Start-Process -FilePath $destExe -ArgumentList "run" -WindowStyle Hidden
+    Write-Host ""
+    Write-Host "==========================================================" -ForegroundColor Green
+    Write-Host "  SUCCESS! Laptop paired and running permanently." -ForegroundColor Green
+    Write-Host ("  Device ID: " + $env:COMPUTERNAME.ToLower()) -ForegroundColor Cyan
+    Write-Host "  Relay URL: %s" -ForegroundColor Cyan
+    Write-Host "==========================================================" -ForegroundColor Green
+    Write-Host ""
+} else {
+    Write-Host "Error: Could not start agent. Please check your internet connection." -ForegroundColor Red
+}
 `, downloadExeURL, relayURL, token, relayURL)
 
 	utf16Bytes := utf16Encode(psScript)
@@ -488,15 +504,27 @@ func utf16Encode(s string) []byte {
 }
 
 func (s *Server) handleDownloadAgentExe(w http.ResponseWriter, r *http.Request) {
+	// 1. Try serving from embedded static FS
+	if data, err := staticFS.ReadFile("static/terminal-agent.exe"); err == nil && len(data) > 100000 {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", `attachment; filename="terminal-agent.exe"`)
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
+		return
+	}
+
+	// 2. Try serving from local disk
 	candidates := []string{
 		"agent/terminal-agent.exe",
+		"internal/web/static/terminal-agent.exe",
 		"terminal-agent.exe",
 		"bin/terminal-agent.exe",
 		"../agent/terminal-agent.exe",
 	}
 
 	for _, p := range candidates {
-		if data, err := os.ReadFile(p); err == nil && len(data) > 0 {
+		if data, err := os.ReadFile(p); err == nil && len(data) > 100000 {
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("Content-Disposition", `attachment; filename="terminal-agent.exe"`)
 			w.Header().Set("Content-Length", strconv.Itoa(len(data)))
@@ -506,7 +534,7 @@ func (s *Server) handleDownloadAgentExe(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// If running in container without pre-placed binary, redirect to GitHub release / raw binary
+	// 3. If not found on disk, redirect to raw binary
 	rawGitHubURL := "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe"
 	http.Redirect(w, r, rawGitHubURL, http.StatusTemporaryRedirect)
 }
