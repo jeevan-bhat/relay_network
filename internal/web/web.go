@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -50,6 +51,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	// REST API
 	mux.HandleFunc("/api/system/status", s.handleSystemStatus)
 	mux.HandleFunc("/api/download/installer.bat", s.handleDownloadInstaller)
+	mux.HandleFunc("/api/download/terminal-agent.exe", s.handleDownloadAgentExe)
 	mux.HandleFunc("/api/auth/register", s.handleRegister)
 	mux.HandleFunc("/api/auth/login", s.handleLogin)
 	mux.HandleFunc("/api/auth/me", s.handleAuthMe)
@@ -410,7 +412,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
   "  else { " ^
   "    Write-Host 'Downloading agent binary from cloud...' -ForegroundColor Yellow; " ^
   "    try { Invoke-WebRequest -Uri '%s' -OutFile $destExe -UseBasicParsing } catch { " ^
-  "      Write-Host 'Connecting with local agent.' -ForegroundColor Gray " ^
+  "      try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe' -OutFile $destExe -UseBasicParsing } catch { " ^
+  "        Write-Host 'Connecting with local agent.' -ForegroundColor Gray " ^
+  "      } " ^
   "    } " ^
   "  } " ^
   "}; " ^
@@ -444,6 +448,30 @@ pause
 	w.Header().Set("Content-Disposition", `attachment; filename="install-startup-agent.bat"`)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(script))
+}
+
+func (s *Server) handleDownloadAgentExe(w http.ResponseWriter, r *http.Request) {
+	candidates := []string{
+		"agent/terminal-agent.exe",
+		"terminal-agent.exe",
+		"bin/terminal-agent.exe",
+		"../agent/terminal-agent.exe",
+	}
+
+	for _, p := range candidates {
+		if data, err := os.ReadFile(p); err == nil && len(data) > 0 {
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Disposition", `attachment; filename="terminal-agent.exe"`)
+			w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
+			return
+		}
+	}
+
+	// If running in container without pre-placed binary, redirect to GitHub release / raw binary
+	rawGitHubURL := "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe"
+	http.Redirect(w, r, rawGitHubURL, http.StatusTemporaryRedirect)
 }
 
 

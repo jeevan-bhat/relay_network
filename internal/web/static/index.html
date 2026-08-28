@@ -1287,6 +1287,27 @@
       cmdInput.value = '';
     }
 
+    cmdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') {
+        if (cmdHistory.length > 0 && historyIdx > 0) {
+          historyIdx--;
+          cmdInput.value = cmdHistory[historyIdx];
+          setTimeout(() => cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length), 0);
+        }
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        if (cmdHistory.length > 0 && historyIdx < cmdHistory.length - 1) {
+          historyIdx++;
+          cmdInput.value = cmdHistory[historyIdx];
+          setTimeout(() => cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length), 0);
+        } else {
+          historyIdx = cmdHistory.length;
+          cmdInput.value = '';
+        }
+        e.preventDefault();
+      }
+    });
+
     commandForm.onsubmit = (e) => {
       e.preventDefault();
       const val = cmdInput.value.trim();
@@ -1398,12 +1419,32 @@
         return;
       }
       const filename = payload.path.split('\\').pop() || 'download';
-      const link = document.createElement('a');
-      link.href = `data:application/octet-stream;base64,${payload.contentBase64}`;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      
+      try {
+        const byteChars = atob(payload.contentBase64);
+        const byteNumbers = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteNumbers[i] = byteChars.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } catch (e) {
+        const link = document.createElement('a');
+        link.href = `data:application/octet-stream;base64,${payload.contentBase64}`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     }
 
     function deleteFile(filePath) {
@@ -1471,7 +1512,7 @@
       }
 
       procTableBody.innerHTML = procs.map(p => {
-        const memMb = (p.memoryBytes / (1024*1024)).toFixed(1);
+        const memMb = (p.memoryMb != null ? p.memoryMb : (p.memoryBytes ? p.memoryBytes / (1024*1024) : 0)).toFixed(1);
         return `
           <tr class="hover:bg-slate-900/60">
             <td class="p-2 text-slate-400 font-mono">${p.pid}</td>
