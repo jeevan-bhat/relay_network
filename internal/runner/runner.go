@@ -51,18 +51,31 @@ func Run() {
 	if envToken := os.Getenv("AUTH_TOKEN"); envToken != "" {
 		cfg.AuthToken = envToken
 	}
+	if envSupabaseURL := os.Getenv("SUPABASE_URL"); envSupabaseURL != "" {
+		cfg.SupabaseURL = envSupabaseURL
+	}
+	if envSupabaseKey := os.Getenv("SUPABASE_KEY"); envSupabaseKey != "" {
+		cfg.SupabaseKey = envSupabaseKey
+	} else if envServiceKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY"); envServiceKey != "" {
+		cfg.SupabaseKey = envServiceKey
+	}
 
 	// Ensure DB directory exists
 	if dir := filepath.Dir(cfg.DBPath); dir != "" && dir != "." {
 		_ = os.MkdirAll(dir, 0o755)
 	}
 
-	st, err := store.Open(cfg.DBPath)
+	st, err := store.OpenWithConfig(cfg.DBPath, cfg.SupabaseURL, cfg.SupabaseKey)
 	if err != nil {
 		log.Error("failed to open relay database", "err", err, "path", cfg.DBPath)
 		os.Exit(1)
 	}
 	defer st.Close()
+
+	dbBackend := "Local SQLite (" + cfg.DBPath + ")"
+	if st.IsSupabase() {
+		dbBackend = "🟢 Supabase Cloud Active (" + cfg.SupabaseURL + ")"
+	}
 
 	h := hub.New(st, cfg, log)
 	defer h.Close()
@@ -85,9 +98,9 @@ func Run() {
   ---------------------------------------------------------
   Web Dashboard: http://localhost:%d
   WebSocket URL: ws://localhost:%d/ws
-  Database:      %s
+  Storage Mode:  %s
 ===========================================================
-`, cfg.Port, cfg.Port, cfg.DBPath)
+`, cfg.Port, cfg.Port, dbBackend)
 
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error("server error", "err", err)

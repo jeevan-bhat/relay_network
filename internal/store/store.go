@@ -1,4 +1,4 @@
-// Package store provides SQLite-backed persistent storage for the Relay server.
+// Package store provides Supabase cloud-backed and SQLite persistent storage for the Relay server.
 // It manages registered devices, cloud offline command queues, and historical results.
 package store
 
@@ -36,13 +36,31 @@ type CommandRecord struct {
 	CompletedAt  int64
 }
 
-// Store owns the SQLite connection for the relay server.
+// Store owns the persistence connection for the relay server (SQLite or Supabase Cloud).
 type Store struct {
-	db *sql.DB
+	db       *sql.DB
+	supabase *SupabaseStore
 }
 
-// Open opens (or creates) the relay SQLite database at path.
+// Open opens (or creates) the relay database. If SUPABASE_URL and SUPABASE_KEY are set,
+// it uses Supabase Cloud directly. Otherwise, it uses local SQLite.
 func Open(path string) (*Store, error) {
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseKey := os.Getenv("SUPABASE_KEY")
+	if supabaseKey == "" {
+		supabaseKey = os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+	}
+	if supabaseKey == "" {
+		supabaseKey = os.Getenv("SUPABASE_ANON_KEY")
+	}
+
+	if supabaseURL != "" && supabaseKey != "" {
+		sb, err := NewSupabaseStore(supabaseURL, supabaseKey)
+		if err == nil {
+			return &Store{supabase: sb}, nil
+		}
+	}
+
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("create db dir %q: %w", dir, err)
@@ -67,9 +85,28 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
+// OpenWithConfig opens the store with explicit Supabase or SQLite parameters.
+func OpenWithConfig(path, supabaseURL, supabaseKey string) (*Store, error) {
+	if supabaseURL != "" && supabaseKey != "" {
+		sb, err := NewSupabaseStore(supabaseURL, supabaseKey)
+		if err == nil {
+			return &Store{supabase: sb}, nil
+		}
+	}
+	return Open(path)
+}
+
+// IsSupabase returns true if the store is backed by Supabase Cloud.
+func (s *Store) IsSupabase() bool {
+	return s.supabase != nil
+}
+
 // Close closes the database connection.
 func (s *Store) Close() error {
-	return s.db.Close()
+	if s.db != nil {
+		return s.db.Close()
+	}
+	return nil
 }
 
 const schema = `
@@ -135,6 +172,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_time ON AuditLogs(Timestamp DESC);
 `
 
 func (s *Store) migrate() error {
+	if s.db == nil {
+		return nil
+	}
 	if _, err := s.db.Exec(schema); err != nil {
 		return err
 	}
@@ -144,6 +184,9 @@ func (s *Store) migrate() error {
 
 // UpsertDevice inserts or updates a device registration.
 func (s *Store) UpsertDevice(info protocol.DeviceInfo) error {
+	if s.supabase != nil {
+		return s.supabase.UpsertDevice(info)
+	}
 	healthBytes, _ := json.Marshal(info.Metrics)
 	_, err := s.db.Exec(`
 		INSERT INTO Devices (DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON)
@@ -162,6 +205,9 @@ func (s *Store) UpsertDevice(info protocol.DeviceInfo) error {
 
 // UpdateDeviceHeartbeat updates heartbeat time, telemetry metrics, and status for a device.
 func (s *Store) UpdateDeviceHeartbeat(deviceID string, metrics protocol.HealthMetrics, status string) error {
+	if s.supabase != nil {
+		return s.supabase.UpdateDeviceHeartbeat(deviceID, metrics, status)
+	}
 	healthBytes, _ := json.Marshal(metrics)
 	now := time.Now().Unix()
 	_, err := s.db.Exec(`
@@ -174,12 +220,18 @@ func (s *Store) UpdateDeviceHeartbeat(deviceID string, metrics protocol.HealthMe
 
 // UpdateDeviceStatus updates the connection status (ONLINE, DEGRADED, OFFLINE) of a device.
 func (s *Store) UpdateDeviceStatus(deviceID string, status string) error {
+	if s.supabase != nil {
+		return s.supabase.UpdateDeviceStatus(deviceID, status)
+	}
 	_, err := s.db.Exec(`UPDATE Devices SET Status = ? WHERE DeviceId = ?`, status, deviceID)
 	return err
 }
 
 // GetDevice retrieves a device by DeviceID.
 func (s *Store) GetDevice(deviceID string) (*protocol.DeviceInfo, error) {
+	if s.supabase != nil {
+		return s.supabase.GetDevice(deviceID)
+	}
 	var (
 		d           protocol.DeviceInfo
 		userID      sql.NullString
@@ -210,6 +262,9 @@ func (s *Store) GetDevice(deviceID string) (*protocol.DeviceInfo, error) {
 
 // ListDevices returns all registered devices.
 func (s *Store) ListDevices() ([]protocol.DeviceInfo, error) {
+	if s.supabase != nil {
+		return s.supabase.ListDevices()
+	}
 	rows, err := s.db.Query(`
 		SELECT DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
 		  FROM Devices ORDER BY LastHeartbeat DESC
@@ -244,6 +299,9 @@ func (s *Store) ListDevices() ([]protocol.DeviceInfo, error) {
 
 // CreateUser registers a new user with plain/viewable password and generates a unique AuthToken.
 func (s *Store) CreateUser(username, password string) (*protocol.UserAccount, error) {
+	if s.supabase != nil {
+		return s.supabase.CreateUser(username, password)
+	}
 	if username == "" || password == "" {
 		return nil, fmt.Errorf("username and password cannot be empty")
 	}
@@ -270,6 +328,9 @@ func (s *Store) CreateUser(username, password string) (*protocol.UserAccount, er
 
 // AuthenticateUser checks username and password and returns the user record.
 func (s *Store) AuthenticateUser(username, password string) (*protocol.UserAccount, error) {
+	if s.supabase != nil {
+		return s.supabase.AuthenticateUser(username, password)
+	}
 	var u protocol.UserAccount
 	err := s.db.QueryRow(`
 		SELECT UserId, Username, Password, AuthToken, CreatedAt
@@ -290,6 +351,9 @@ func (s *Store) GetUserByToken(token string) (*protocol.UserAccount, error) {
 	if token == "" {
 		return nil, nil
 	}
+	if s.supabase != nil {
+		return s.supabase.GetUserByToken(token)
+	}
 	var u protocol.UserAccount
 	err := s.db.QueryRow(`
 		SELECT UserId, Username, Password, AuthToken, CreatedAt
@@ -307,6 +371,9 @@ func (s *Store) GetUserByToken(token string) (*protocol.UserAccount, error) {
 
 // GetUserByUsername finds a user by username.
 func (s *Store) GetUserByUsername(username string) (*protocol.UserAccount, error) {
+	if s.supabase != nil {
+		return s.supabase.GetUserByUsername(username)
+	}
 	var u protocol.UserAccount
 	err := s.db.QueryRow(`
 		SELECT UserId, Username, Password, AuthToken, CreatedAt
@@ -324,6 +391,9 @@ func (s *Store) GetUserByUsername(username string) (*protocol.UserAccount, error
 
 // ListDevicesForUser returns devices belonging to the specified user (or unclaimed if user has no devices yet).
 func (s *Store) ListDevicesForUser(userID string) ([]protocol.DeviceInfo, error) {
+	if s.supabase != nil {
+		return s.supabase.ListDevicesForUser(userID)
+	}
 	rows, err := s.db.Query(`
 		SELECT DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
 		  FROM Devices
@@ -358,12 +428,18 @@ func (s *Store) ListDevicesForUser(userID string) ([]protocol.DeviceInfo, error)
 
 // BindDeviceToUser associates a device with a user.
 func (s *Store) BindDeviceToUser(deviceID, userID string) error {
+	if s.supabase != nil {
+		return s.supabase.BindDeviceToUser(deviceID, userID)
+	}
 	_, err := s.db.Exec(`UPDATE Devices SET UserId = ? WHERE DeviceId = ?`, userID, deviceID)
 	return err
 }
 
 // EnqueueCommand stores a new command for a device with Status = PENDING.
 func (s *Store) EnqueueCommand(cmd protocol.CommandPayload) error {
+	if s.supabase != nil {
+		return s.supabase.EnqueueCommand(cmd)
+	}
 	now := cmd.CreatedAt
 	if now == 0 {
 		now = time.Now().Unix()
@@ -380,6 +456,9 @@ func (s *Store) EnqueueCommand(cmd protocol.CommandPayload) error {
 
 // GetPendingCommands returns all PENDING commands for a device in FIFO order.
 func (s *Store) GetPendingCommands(deviceID string) ([]protocol.CommandPayload, error) {
+	if s.supabase != nil {
+		return s.supabase.GetPendingCommands(deviceID)
+	}
 	rows, err := s.db.Query(`
 		SELECT CommandId, DeviceId, Command, TimeoutSec, CreatedAt
 		  FROM CloudCommandQueue
@@ -404,6 +483,9 @@ func (s *Store) GetPendingCommands(deviceID string) ([]protocol.CommandPayload, 
 
 // CancelPendingCommands marks all PENDING commands for a device as FAILED/CANCELLED.
 func (s *Store) CancelPendingCommands(deviceID string) error {
+	if s.supabase != nil {
+		return nil
+	}
 	now := time.Now().Unix()
 	_, err := s.db.Exec(`
 		UPDATE CloudCommandQueue
@@ -415,6 +497,9 @@ func (s *Store) CancelPendingCommands(deviceID string) error {
 
 // MarkCommandDispatched sets a command's status to DISPATCHED.
 func (s *Store) MarkCommandDispatched(commandID string) error {
+	if s.supabase != nil {
+		return s.supabase.MarkCommandDispatched(commandID)
+	}
 	now := time.Now().Unix()
 	_, err := s.db.Exec(`
 		UPDATE CloudCommandQueue
@@ -426,6 +511,9 @@ func (s *Store) MarkCommandDispatched(commandID string) error {
 
 // MarkCommandCompleted marks a command as COMPLETED or FAILED.
 func (s *Store) MarkCommandCompleted(commandID string, status string) error {
+	if s.supabase != nil {
+		return s.supabase.MarkCommandCompleted(commandID, status)
+	}
 	now := time.Now().Unix()
 	_, err := s.db.Exec(`
 		UPDATE CloudCommandQueue
@@ -437,6 +525,9 @@ func (s *Store) MarkCommandCompleted(commandID string, status string) error {
 
 // GetCommand retrieves a command record by CommandID.
 func (s *Store) GetCommand(commandID string) (*CommandRecord, error) {
+	if s.supabase != nil {
+		return s.supabase.GetCommand(commandID)
+	}
 	var c CommandRecord
 	err := s.db.QueryRow(`
 		SELECT CommandId, DeviceId, Command, TimeoutSec, Status, CreatedAt, DispatchedAt, CompletedAt
@@ -489,6 +580,9 @@ func (s *Store) ListCommands(deviceID string, limit int) ([]CommandRecord, error
 
 // SaveResult saves an execution result and updates the command status.
 func (s *Store) SaveResult(res protocol.ResultPayload) error {
+	if s.supabase != nil {
+		return s.supabase.SaveResult(res)
+	}
 	now := time.Now().Unix()
 	if res.ExecutedAt == 0 {
 		res.ExecutedAt = now
@@ -520,6 +614,9 @@ func (s *Store) SaveResult(res protocol.ResultPayload) error {
 
 // SaveSandboxResult saves a result to CloudResultQueue without changing CloudCommandQueue status from PENDING.
 func (s *Store) SaveSandboxResult(res protocol.ResultPayload) error {
+	if s.supabase != nil {
+		return s.supabase.SaveSandboxResult(res)
+	}
 	now := time.Now().Unix()
 	if res.ExecutedAt == 0 {
 		res.ExecutedAt = now
@@ -542,6 +639,9 @@ func (s *Store) SaveSandboxResult(res protocol.ResultPayload) error {
 
 // GetResult retrieves the execution result for a CommandID.
 func (s *Store) GetResult(commandID string) (*protocol.ResultPayload, error) {
+	if s.supabase != nil {
+		return s.supabase.GetResult(commandID)
+	}
 	var r protocol.ResultPayload
 	err := s.db.QueryRow(`
 		SELECT ResultId, CommandId, DeviceId, Stdout, Stderr, ExitCode, ExecutedAt
@@ -558,6 +658,9 @@ func (s *Store) GetResult(commandID string) (*protocol.ResultPayload, error) {
 
 // ListResults returns historical results for a device (or all devices if deviceID is empty).
 func (s *Store) ListResults(deviceID string, limit int) ([]protocol.ResultPayload, error) {
+	if s.supabase != nil {
+		return s.supabase.ListResults(deviceID, limit)
+	}
 	if limit <= 0 {
 		limit = 50
 	}
@@ -594,6 +697,9 @@ func (s *Store) ListResults(deviceID string, limit int) ([]protocol.ResultPayloa
 
 // RecordAuditLog inserts an immutable audit log entry.
 func (s *Store) RecordAuditLog(log protocol.AuditLogRecord) error {
+	if s.supabase != nil {
+		return s.supabase.RecordAuditLog(log)
+	}
 	if log.Timestamp == 0 {
 		log.Timestamp = time.Now().Unix()
 	}
@@ -606,6 +712,9 @@ func (s *Store) RecordAuditLog(log protocol.AuditLogRecord) error {
 
 // ListAuditLogs returns recent audit log entries, newest first.
 func (s *Store) ListAuditLogs(deviceID string, limit int) ([]protocol.AuditLogRecord, error) {
+	if s.supabase != nil {
+		return s.supabase.ListAuditLogs(deviceID, limit)
+	}
 	if limit <= 0 {
 		limit = 100
 	}
@@ -646,4 +755,3 @@ func (s *Store) ListAuditLogs(deviceID string, limit int) ([]protocol.AuditLogRe
 	}
 	return logs, rows.Err()
 }
-

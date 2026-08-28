@@ -48,6 +48,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	})
 
 	// REST API
+	mux.HandleFunc("/api/system/status", s.handleSystemStatus)
 	mux.HandleFunc("/api/auth/register", s.handleRegister)
 	mux.HandleFunc("/api/auth/login", s.handleLogin)
 	mux.HandleFunc("/api/auth/me", s.handleAuthMe)
@@ -358,6 +359,18 @@ func sendMagicPacket(macStr, broadcastIP string) error {
 
 	_, err = conn.Write(packet)
 	return err
+}
+
+func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
+	backend := "sqlite"
+	if s.store.IsSupabase() {
+		backend = "supabase"
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"storage_backend": backend,
+		"is_supabase":     s.store.IsSupabase(),
+	})
 }
 
 
