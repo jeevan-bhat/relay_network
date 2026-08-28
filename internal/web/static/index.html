@@ -38,7 +38,8 @@
     .terminal-scroll::-webkit-scrollbar-track { background: #0f172a; }
     .terminal-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
     button, input, select { touch-action: manipulation; }
-    /* Standalone PWA Optimizations */
+    
+    /* Native App Standalone Mode */
     @media all and (display-mode: standalone) {
       body {
         -webkit-user-select: none;
@@ -49,96 +50,114 @@
     }
   </style>
 </head>
-<body class="bg-dark-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-black pb-16 md:pb-0">
+<body class="bg-dark-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-black pb-20 md:pb-0">
 
-  <!-- Top App Bar -->
-  <header class="bg-dark-900/95 backdrop-blur border-b border-slate-800 px-3 sm:px-4 py-2.5 flex items-center justify-between sticky top-0 z-40">
+  <!-- Top App Header -->
+  <header class="bg-dark-900/95 backdrop-blur-md border-b border-slate-800 px-3 sm:px-4 py-2.5 flex items-center justify-between sticky top-0 z-40 shadow-sm">
     <div class="flex items-center space-x-2.5">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center font-mono font-bold text-black text-sm shadow-md shadow-brand-500/20">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center font-mono font-bold text-black text-sm shadow-md shadow-brand-500/20">
         &gt;_
       </div>
       <div>
         <h1 class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
-          Terminal App <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-normal">v4.0 Mobile</span>
+          Terminal App <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono font-semibold">v4.0</span>
         </h1>
         <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
-          <span id="activeDevStatusDot" class="w-2 h-2 rounded-full bg-slate-600"></span>
-          <span id="activeDevHeaderTitle" class="font-mono text-slate-300">Select target device</span>
+          <span id="relayStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span id="relayStatusText" class="font-mono text-slate-300">Relay Connected</span>
         </div>
       </div>
     </div>
 
-    <!-- User Profile, Add App to Mobile, Device Picker & Relay Badge -->
-    <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs font-mono">
-      <select id="deviceSelector" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-emerald-500 max-w-[120px] sm:max-w-none truncate">
-        <option value="">(No Devices)</option>
-      </select>
-
-      <button id="addMobileAppBtn" onclick="triggerInstallApp()" class="flex items-center gap-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-bold border border-emerald-500/60 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-sans transition shadow-md shadow-brand-500/20" title="Add App to Mobile / Home Screen">
+    <!-- Quick Action Buttons -->
+    <div class="flex items-center space-x-1.5 text-xs font-mono">
+      <button id="addMobileAppBtn" onclick="triggerInstallApp()" class="flex items-center gap-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-bold border border-emerald-500/60 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-sans transition shadow-sm" title="Add App to Mobile / Home Screen">
         <span>📲</span>
-        <span class="hidden sm:inline">Add App to Mobile</span>
+        <span class="hidden sm:inline">Add to Mobile</span>
       </button>
 
       <button id="userProfileBtn" onclick="openAccountModal()" class="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-sans transition">
         <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
         <span id="userProfileName" class="font-semibold">Account</span>
       </button>
-
-      <div id="relayBadge" class="hidden md:flex items-center space-x-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
-        <span id="relayStatusDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-        <span id="relayStatusText" class="text-[11px] text-slate-300">Connecting...</span>
-      </div>
     </div>
   </header>
 
   <!-- Desktop Tab Bar (Hidden on Mobile) -->
   <nav class="hidden md:flex bg-dark-900 border-b border-slate-800 px-6 py-2 items-center space-x-4 text-xs font-medium">
-    <button onclick="switchTab('terminal')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="terminal">
+    <button onclick="switchTab('terminal')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 bg-slate-800 text-emerald-400 font-bold border border-slate-700" data-tab="terminal">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
       Terminal &amp; Commands
     </button>
-    <button onclick="switchTab('files')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="files">
+    <button onclick="switchTab('files')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200" data-tab="files">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
       File Explorer &amp; Download
     </button>
-    <button onclick="switchTab('health')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="health">
+    <button onclick="switchTab('health')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200" data-tab="health">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-      Health &amp; Processes
+      Health, WoL &amp; Telemetry
     </button>
-    <button onclick="switchTab('audit')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2" data-tab="audit">
+    <button onclick="switchTab('audit')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200" data-tab="audit">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
       Audit Logs
     </button>
   </nav>
 
   <!-- Main Viewports -->
-  <main class="flex-1 max-w-[1400px] w-full mx-auto p-3 sm:p-5 flex flex-col space-y-4">
+  <main class="flex-1 max-w-[1400px] w-full mx-auto p-3 sm:p-5 flex flex-col space-y-3.5">
 
-    <!-- 1-Click Laptop Installer & Account Pairing Banner -->
-    <div id="pairBanner" class="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-800/40 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
-      <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 rounded-lg bg-emerald-900/60 border border-emerald-700/50 flex items-center justify-center text-emerald-400 font-bold text-sm">
-          💻
+    <!-- Active Target Laptop Hero Card -->
+    <div class="bg-gradient-to-br from-dark-900 via-dark-850 to-slate-900 border border-slate-800 rounded-2xl p-3.5 shadow-xl space-y-3">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2.5 w-full sm:w-auto">
+          <div id="activeDevStatusIcon" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl flex-shrink-0">
+            💻
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="activeDevNameDisplay" class="font-bold text-sm text-white font-mono truncate">Searching for laptop...</span>
+              <span id="activeDevStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-slate-800 text-slate-400 border border-slate-700">DETECTING</span>
+            </div>
+            <div class="text-[11px] text-slate-400 font-mono truncate flex items-center gap-1.5 mt-0.5">
+              <span id="activeDevOsDisplay">Windows PC</span>
+              <span>•</span>
+              <span id="activeDevLastSeen">Checking connection...</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <h2 class="text-xs font-bold text-white flex items-center gap-2">
-            Pair Windows Laptop <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-900/80 text-emerald-300 border border-emerald-700">Account Active</span>
-          </h2>
-          <p class="text-[11px] text-slate-300">
-            Download the 1-click installer to your laptop or copy your account pairing token.
-          </p>
+
+        <!-- Target Selector & Quick Switch -->
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <select id="deviceSelector" class="w-full sm:w-auto bg-slate-950 text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-emerald-500 truncate">
+            <option value="">(Loading laptops...)</option>
+          </select>
+          <button onclick="downloadBatInstaller()" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-mono font-bold text-xs rounded-xl transition shadow flex-shrink-0 flex items-center gap-1" title="Download .bat Installer directly to Downloads">
+            <span>⬇️</span> <span class="hidden sm:inline">.bat</span>
+          </button>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-        <button onclick="downloadBatInstaller()" class="flex-1 sm:flex-none px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-black font-mono font-bold text-xs rounded-lg transition shadow-md flex items-center justify-center gap-1.5">
-          <span>⬇️</span> <span>Download .bat Installer</span>
-        </button>
-        <button onclick="copyPairingToken()" class="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-mono font-bold text-xs rounded-lg transition shadow-md flex items-center justify-center gap-1.5">
-          <span>📋</span> <span id="copyTokenBtnText">Copy Token</span>
-        </button>
-        <button onclick="openAccountModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs rounded-lg transition">
-          Credentials
-        </button>
+
+      <!-- Quick Info Bar (MAC Address + 1-Tap Copy + WoL) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs font-mono border-t border-slate-800/80">
+        <div class="bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between">
+          <span class="text-slate-400">MAC Address:</span>
+          <div class="flex items-center gap-1.5">
+            <span id="heroMacText" class="text-emerald-400 font-bold truncate">Detecting...</span>
+            <button onclick="copyCurrentMac()" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-emerald-400 text-xs" title="Copy MAC">📋</button>
+          </div>
+        </div>
+
+        <div class="bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between">
+          <span class="text-slate-400">Wake-on-LAN:</span>
+          <button onclick="triggerQuickWoL()" class="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
+            <span>⚡</span> Send Magic Packet
+          </button>
+        </div>
+
+        <div class="bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between">
+          <span class="text-slate-400">Offline Queue:</span>
+          <span id="heroQueueStatus" class="text-slate-300">Ready (Auto-Runs)</span>
+        </div>
       </div>
     </div>
 
@@ -148,89 +167,97 @@
     <div id="tab-terminal" class="tab-content flex-1 flex flex-col space-y-3">
       
       <!-- Predefined Commands Card / Drawer -->
-      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3 shadow-lg">
+      <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3 shadow-lg">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-            <span class="text-amber-400">⚡</span> Predefined &amp; Basic Commands
-            <span class="text-[10px] text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800">Works Online &amp; Offline</span>
+          <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5 font-mono">
+            <span class="text-amber-400">⚡</span> Quick Actions &amp; Predefined Commands
           </span>
-          <button id="togglePredefBtn" class="text-[11px] text-slate-400 hover:text-slate-200">Hide/Show</button>
+          <button id="togglePredefBtn" class="text-[11px] text-slate-400 hover:text-slate-200 font-mono">Hide/Show</button>
         </div>
-        <div id="predefGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-1.5 text-xs font-mono">
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="status">
-            <span class="font-bold text-emerald-400">status</span>
-            <span class="text-[10px] text-slate-400">Power state &amp; last seen</span>
+        <div id="predefGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 text-xs font-mono">
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="status">
+            <span class="font-bold text-emerald-400">⚡ status</span>
+            <span class="text-[9px] text-slate-400 truncate">Power state</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="health">
-            <span class="font-bold text-emerald-400">health</span>
-            <span class="text-[10px] text-slate-400">CPU, RAM &amp; Uptime</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="health">
+            <span class="font-bold text-emerald-400">🩺 health</span>
+            <span class="text-[9px] text-slate-400 truncate">CPU &amp; RAM</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="Get-Date">
-            <span class="font-bold text-emerald-400">Get-Date</span>
-            <span class="text-[10px] text-slate-400">Current Date &amp; Time</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="Get-Date">
+            <span class="font-bold text-emerald-400">📅 Date</span>
+            <span class="text-[9px] text-slate-400 truncate">Current Time</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="systeminfo">
-            <span class="font-bold text-emerald-400">systeminfo</span>
-            <span class="text-[10px] text-slate-400">OS, RAM &amp; Disk info</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="systeminfo">
+            <span class="font-bold text-emerald-400">💻 sysinfo</span>
+            <span class="text-[9px] text-slate-400 truncate">OS &amp; Disks</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="whoami">
-            <span class="font-bold text-emerald-400">whoami</span>
-            <span class="text-[10px] text-slate-400">User context</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="whoami">
+            <span class="font-bold text-emerald-400">👤 whoami</span>
+            <span class="text-[9px] text-slate-400 truncate">User Context</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="ipconfig">
-            <span class="font-bold text-emerald-400">ipconfig</span>
-            <span class="text-[10px] text-slate-400">Network, IP &amp; MAC</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="ipconfig">
+            <span class="font-bold text-emerald-400">🌐 ipconfig</span>
+            <span class="text-[9px] text-slate-400 truncate">IP &amp; MAC</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="uptime">
-            <span class="font-bold text-emerald-400">uptime</span>
-            <span class="text-[10px] text-slate-400">System uptime</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="uptime">
+            <span class="font-bold text-emerald-400">⏱️ uptime</span>
+            <span class="text-[9px] text-slate-400 truncate">System Uptime</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="queue">
-            <span class="font-bold text-amber-400">queue</span>
-            <span class="text-[10px] text-slate-400">Pending offline tasks</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="queue">
+            <span class="font-bold text-amber-400">📜 queue</span>
+            <span class="text-[9px] text-slate-400 truncate">Offline tasks</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="clear-queue">
-            <span class="font-bold text-amber-400">clear-queue</span>
-            <span class="text-[10px] text-slate-400">Purge pending tasks</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="clear-queue">
+            <span class="font-bold text-amber-400">🗑️ clear-q</span>
+            <span class="text-[9px] text-slate-400 truncate">Purge queue</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="wake">
-            <span class="font-bold text-amber-400">wake</span>
-            <span class="text-[10px] text-slate-400">Send Wake-on-LAN</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="wake">
+            <span class="font-bold text-amber-400">⚡ wake</span>
+            <span class="text-[9px] text-slate-400 truncate">Send WoL</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="ping">
-            <span class="font-bold text-cyan-400">ping</span>
-            <span class="text-[10px] text-slate-400">Probe relay latency</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="ping">
+            <span class="font-bold text-cyan-400">📡 ping</span>
+            <span class="text-[9px] text-slate-400 truncate">Relay RTT</span>
           </button>
-          <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="help">
-            <span class="font-bold text-cyan-400">help</span>
-            <span class="text-[10px] text-slate-400">Command reference</span>
+          <button class="predef-btn p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between transition" data-cmd="help">
+            <span class="font-bold text-cyan-400">❓ help</span>
+            <span class="text-[9px] text-slate-400 truncate">Reference</span>
           </button>
         </div>
       </div>
 
       <!-- Live Terminal Console -->
-      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3 flex-1 flex flex-col min-h-[350px] shadow-lg">
+      <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3 flex-1 flex flex-col min-h-[360px] shadow-lg">
         <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-xs font-mono text-slate-400">
           <div class="flex items-center space-x-2">
             <span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
             <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-            <span class="text-slate-300 font-bold ml-1">PowerShell Interactive Console</span>
+            <span class="text-slate-200 font-bold ml-1">PowerShell Console</span>
           </div>
-          <button id="clearConsoleBtn" class="hover:text-slate-200">Clear</button>
+          <button id="clearConsoleBtn" class="hover:text-slate-200 px-2 py-0.5 rounded bg-slate-800 text-[10px]">Clear</button>
         </div>
 
-        <div id="terminalOutput" class="flex-1 overflow-y-auto font-mono text-xs text-slate-200 space-y-1.5 terminal-scroll pr-1 pb-2">
-          <div class="text-slate-400">Terminal App v4.0 Mobile Controller ready.</div>
-          <div class="text-slate-400">Custom &amp; Predefined commands execute live when online, or queue automatically in cloud when offline.</div>
+        <div id="terminalOutput" class="flex-1 overflow-y-auto font-mono text-xs text-slate-200 space-y-2 terminal-scroll pr-1 pb-2">
+          <div class="text-slate-400">Terminal App v4.0 Mobile ready.</div>
+          <div class="text-slate-400">Commands execute live when online, or queue safely in cloud when laptop is asleep.</div>
         </div>
 
-        <form id="commandForm" class="mt-2 flex gap-2">
+        <!-- Quick Terminal Suggestion Chips -->
+        <div class="flex items-center gap-1.5 overflow-x-auto py-1 text-[11px] font-mono terminal-scroll">
+          <button onclick="insertAndRun('dir')" class="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex-shrink-0">dir</button>
+          <button onclick="insertAndRun('Get-Process')" class="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex-shrink-0">Get-Process</button>
+          <button onclick="insertAndRun('ipconfig')" class="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex-shrink-0">ipconfig</button>
+          <button onclick="insertAndRun('Get-Date')" class="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex-shrink-0">Get-Date</button>
+          <button onclick="insertAndRun('Get-Service')" class="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex-shrink-0">Get-Service</button>
+        </div>
+
+        <form id="commandForm" class="mt-1.5 flex gap-2">
           <div class="relative flex-1">
             <span class="absolute left-3 top-2.5 font-mono text-xs text-emerald-400 font-bold">PS &gt;</span>
-            <input type="text" id="cmdInput" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-12 pr-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Type any PowerShell command (e.g. dir, Get-Process, ipconfig)..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="cmdInput" class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-12 pr-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Type PowerShell command..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           </div>
-          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-black font-mono font-bold text-xs rounded-lg transition shadow-md shadow-brand-500/20">
+          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-black font-mono font-bold text-xs rounded-xl transition shadow-md shadow-brand-500/20 flex-shrink-0">
             Execute
           </button>
         </form>
@@ -242,7 +269,7 @@
     <!-- TAB 2: FILE EXPLORER & DOWNLOAD                                -->
     <!-- ============================================================== -->
     <div id="tab-files" class="tab-content hidden flex-1 flex flex-col space-y-3">
-      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3 shadow-lg flex flex-col flex-1 min-h-[400px]">
+      <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col flex-1 min-h-[400px]">
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 border-b border-slate-800 pb-3 mb-3">
           <div class="flex items-center gap-1.5 flex-1">
             <button id="goUpDirBtn" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 text-xs font-mono" title="Go to parent directory">⬆ Up</button>
@@ -275,11 +302,11 @@
     <!-- ============================================================== -->
     <!-- TAB 3: HEALTH, TELEMETRY, MAC & PROCESSES                      -->
     <!-- ============================================================== -->
-    <div id="tab-health" class="tab-content hidden flex-1 flex flex-col space-y-4">
+    <div id="tab-health" class="tab-content hidden flex-1 flex flex-col space-y-3.5">
       
       <!-- Telemetry Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg">
           <div class="flex items-center justify-between text-xs text-slate-400 font-mono mb-1">
             <span>CPU Usage</span>
             <span id="cpuVal" class="text-emerald-400 font-bold">--%</span>
@@ -289,7 +316,7 @@
           </div>
         </div>
 
-        <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg">
+        <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg">
           <div class="flex items-center justify-between text-xs text-slate-400 font-mono mb-1">
             <span>Memory (RAM)</span>
             <span id="ramVal" class="text-cyan-400 font-bold">--%</span>
@@ -300,19 +327,19 @@
           <div id="ramUsedText" class="text-[10px] text-slate-400 font-mono mt-1 text-right">-- MB / -- MB</div>
         </div>
 
-        <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg flex flex-col justify-between">
+        <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col justify-between">
           <div class="text-xs text-slate-400 font-mono">System Uptime</div>
-          <div id="uptimeText" class="text-lg font-bold font-mono text-amber-400 mt-1">--</div>
+          <div id="uptimeText" class="text-base font-bold font-mono text-amber-400 mt-1">--</div>
         </div>
 
-        <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg flex flex-col justify-between">
-          <div class="text-xs text-slate-400 font-mono">Physical MAC Address</div>
+        <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col justify-between">
+          <div class="text-xs text-slate-400 font-mono">Physical MAC</div>
           <div id="macTextDisplay" class="text-xs font-bold font-mono text-emerald-400 mt-1 truncate">--</div>
         </div>
       </div>
 
       <!-- Process Manager -->
-      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3 shadow-lg flex flex-col flex-1 min-h-[350px]">
+      <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col flex-1 min-h-[350px]">
         <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-xs font-mono">
           <div class="flex items-center space-x-2">
             <span class="font-bold text-slate-200">Active Process Manager</span>
@@ -338,19 +365,19 @@
         </div>
       </div>
 
-      <!-- Wake-on-LAN Controller with Auto-Detected Laptop MAC -->
-      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg space-y-2.5">
+      <!-- Wake-on-LAN Controller -->
+      <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg space-y-2.5">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5 font-mono">
-            <span class="text-amber-400">⚡</span> Remote Wake-on-LAN (WoL) Magic Packet
+            <span class="text-amber-400">⚡</span> Remote Wake-on-LAN (WoL) Trigger
           </h3>
           <div class="text-[11px] font-mono text-slate-400">
             Detected MAC: <span id="currentMacDisplay" class="text-emerald-400 font-bold font-mono">--</span>
           </div>
         </div>
         <div class="flex gap-2">
-          <input type="text" id="wolMacInput" placeholder="Target MAC Address (e.g. 00:1A:2B:3C:4D:5E)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500" />
-          <button id="sendWolBtn" class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs rounded-lg transition">Send Magic Packet</button>
+          <input type="text" id="wolMacInput" placeholder="Target MAC Address (e.g. 00:1A:2B:3C:4D:5E)" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500" />
+          <button id="sendWolBtn" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs rounded-xl transition">Send Magic Packet</button>
         </div>
       </div>
 
@@ -360,7 +387,7 @@
     <!-- TAB 4: AUDIT LOGS                                              -->
     <!-- ============================================================== -->
     <div id="tab-audit" class="tab-content hidden flex-1 flex flex-col space-y-3">
-      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3 shadow-lg flex flex-col flex-1 min-h-[400px]">
+      <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col flex-1 min-h-[400px]">
         <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-xs font-mono">
           <span class="font-bold text-slate-200">Immutable Audit Trail</span>
           <button id="refreshAuditBtn" class="text-emerald-400 hover:text-emerald-300">Refresh</button>
@@ -389,34 +416,34 @@
   <!-- MODAL 1: AUTHENTICATION / LOGIN / REGISTER                     -->
   <!-- ============================================================== -->
   <div id="authModal" class="hidden fixed inset-0 z-50 bg-dark-950/90 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-dark-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
+    <div class="bg-dark-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
       <div class="text-center space-y-1">
-        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 mx-auto flex items-center justify-center font-mono font-bold text-black text-xl shadow-lg shadow-brand-500/20 mb-2">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 mx-auto flex items-center justify-center font-mono font-bold text-black text-xl shadow-lg shadow-brand-500/20 mb-2">
           &gt;_
         </div>
-        <h2 class="text-lg font-bold text-white">Terminal App Mobile &amp; Cloud</h2>
+        <h2 class="text-lg font-bold text-white">Terminal App Mobile</h2>
         <p class="text-xs text-slate-400">Sign in or create an account to manage your laptops securely.</p>
       </div>
 
       <!-- Tab Switcher (Sign In / Register) -->
-      <div class="grid grid-cols-2 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-mono">
-        <button id="authTabLogin" onclick="setAuthMode('login')" class="py-2 rounded-lg font-bold bg-slate-800 text-emerald-400 transition">Sign In</button>
-        <button id="authTabRegister" onclick="setAuthMode('register')" class="py-2 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition">Create Account</button>
+      <div class="grid grid-cols-2 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs font-mono">
+        <button id="authTabLogin" onclick="setAuthMode('login')" class="py-2 rounded-xl font-bold bg-slate-800 text-emerald-400 transition">Sign In</button>
+        <button id="authTabRegister" onclick="setAuthMode('register')" class="py-2 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition">Create Account</button>
       </div>
 
-      <div id="authErrorMsg" class="hidden p-2.5 rounded-lg bg-red-950/80 border border-red-800 text-red-300 text-xs font-mono"></div>
+      <div id="authErrorMsg" class="hidden p-2.5 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-mono"></div>
 
       <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-3.5 text-xs font-mono">
         <div>
           <label class="block text-slate-400 mb-1">Username</label>
-          <input type="text" id="authUsername" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Enter username" autocomplete="username" autocapitalize="none" />
+          <input type="text" id="authUsername" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Enter username" autocomplete="username" autocapitalize="none" />
         </div>
 
         <div>
           <label class="block text-slate-400 mb-1">Password</label>
           <div class="relative">
-            <input type="password" id="authPassword" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 pr-10 text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Enter password" autocomplete="current-password" />
-            <button type="button" onclick="togglePasswordVisibility('authPassword', 'authPwEye')" class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-200">
+            <input type="password" id="authPassword" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 pr-10 text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Enter password" autocomplete="current-password" />
+            <button type="button" onclick="togglePasswordVisibility('authPassword', 'authPwEye')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-200">
               <span id="authPwEye">👁️</span>
             </button>
           </div>
@@ -424,17 +451,13 @@
 
         <div class="flex items-center space-x-2 pt-1">
           <input type="checkbox" id="authRemember" checked class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-0 cursor-pointer" />
-          <label for="authRemember" class="text-slate-300 cursor-pointer text-[11px]">Remember me on this mobile device (Auto-Login)</label>
+          <label for="authRemember" class="text-slate-300 cursor-pointer text-[11px]">Remember me on this mobile device</label>
         </div>
 
-        <button type="submit" id="authSubmitBtn" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold font-mono text-sm rounded-xl transition shadow-lg shadow-brand-500/20 mt-2">
+        <button type="submit" id="authSubmitBtn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-black font-bold font-mono text-sm rounded-2xl transition shadow-lg shadow-brand-500/20 mt-2">
           Sign In
         </button>
       </form>
-
-      <div class="text-center pt-1 text-[11px] text-slate-500">
-        🔒 Private Account Isolation • 🌙 Cloud Sleep Memory • ⚡ Offline Queueing
-      </div>
     </div>
   </div>
 
@@ -442,59 +465,51 @@
   <!-- MODAL 2: USER CREDENTIALS & ACCOUNT PROFILE                    -->
   <!-- ============================================================== -->
   <div id="accountModal" class="hidden fixed inset-0 z-50 bg-dark-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-dark-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto terminal-scroll">
+    <div class="bg-dark-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto terminal-scroll">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-sm font-bold text-white flex items-center gap-2">
-          <span>👤</span> My Account &amp; Credentials
+          <span>👤</span> Account &amp; Credentials
         </h2>
         <button onclick="closeAccountModal()" class="text-slate-400 hover:text-slate-200 text-lg leading-none font-bold">✕</button>
       </div>
 
-      <!-- Account Credentials (Visible to User) -->
+      <!-- Account Credentials -->
       <div class="space-y-3 text-xs font-mono">
         <div>
           <label class="block text-slate-400 mb-1">Username</label>
-          <input type="text" id="profUsername" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-emerald-400 font-bold" />
+          <input type="text" id="profUsername" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-bold" />
         </div>
 
         <div>
-          <label class="block text-slate-400 mb-1">Password / Recovery Key</label>
+          <label class="block text-slate-400 mb-1">Password</label>
           <div class="flex gap-2">
             <div class="relative flex-1">
-              <input type="password" id="profPassword" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 pr-10 text-slate-200" />
-              <button type="button" onclick="togglePasswordVisibility('profPassword', 'profPwEye')" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200" title="Show/Hide Password">
+              <input type="password" id="profPassword" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-10 text-slate-200" />
+              <button type="button" onclick="togglePasswordVisibility('profPassword', 'profPwEye')" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200">
                 <span id="profPwEye">👁️</span>
               </button>
             </div>
-            <button onclick="copyToClipboard(document.getElementById('profPassword').value, 'Password copied!')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg transition">Copy</button>
+            <button onclick="copyToClipboard(document.getElementById('profPassword').value, 'Password copied!')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl transition">Copy</button>
           </div>
         </div>
 
         <div>
-          <label class="block text-slate-400 mb-1">Your Account Pairing Token (Use on your Laptops)</label>
+          <label class="block text-slate-400 mb-1">Your Pairing Token</label>
           <div class="flex gap-2">
-            <input type="text" id="profToken" readonly class="flex-1 bg-slate-950 border border-emerald-800/80 rounded-lg px-3 py-2 text-emerald-400 font-bold truncate" />
-            <button onclick="copyPairingToken()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-black font-bold rounded-lg transition">Copy Token</button>
+            <input type="text" id="profToken" readonly class="flex-1 bg-slate-950 border border-emerald-800/80 rounded-xl px-3 py-2 text-emerald-400 font-bold truncate" />
+            <button onclick="copyPairingToken()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-black font-bold rounded-xl transition">Copy Token</button>
           </div>
         </div>
       </div>
 
-      <!-- Action Buttons (Download .bat & Add App to Mobile) -->
+      <!-- Action Buttons -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-xs">
-        <button onclick="downloadBatInstaller()" class="p-2.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 rounded-xl text-cyan-300 flex items-center justify-center gap-2 font-bold transition">
+        <button onclick="downloadBatInstaller()" class="p-3 bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 rounded-2xl text-cyan-300 flex items-center justify-center gap-2 font-bold transition">
           <span>⬇️</span> Download .bat Installer
         </button>
-        <button onclick="triggerInstallApp()" class="p-2.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 rounded-xl text-emerald-300 flex items-center justify-center gap-2 font-bold transition">
+        <button onclick="triggerInstallApp()" class="p-3 bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 rounded-2xl text-emerald-300 flex items-center justify-center gap-2 font-bold transition">
           <span>📲</span> Add App to Mobile
         </button>
-      </div>
-
-      <!-- Pairing Guide Card -->
-      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-300 space-y-1.5 font-mono">
-        <div class="font-bold text-amber-400 flex items-center gap-1">⚡ Quick Setup on Windows Laptop:</div>
-        <p>1. Tap <span class="text-cyan-400 font-bold">Download .bat Installer</span> above (downloads to your Downloads folder).</p>
-        <p>2. Double-click the downloaded <code class="text-emerald-400">install-startup-agent.bat</code> file on your laptop.</p>
-        <p>3. Your laptop will automatically connect in the background and appear in this dashboard!</p>
       </div>
 
       <!-- Paired Laptops List -->
@@ -508,10 +523,10 @@
       </div>
 
       <div class="flex justify-between items-center pt-3 border-t border-slate-800">
-        <button onclick="handleLogout()" class="px-3 py-1.5 bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 rounded-lg text-xs font-mono transition">
-          Sign Out of Account
+        <button onclick="handleLogout()" class="px-3 py-1.5 bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 rounded-xl text-xs font-mono transition">
+          Sign Out
         </button>
-        <button onclick="closeAccountModal()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono">
+        <button onclick="closeAccountModal()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono">
           Done
         </button>
       </div>
@@ -522,10 +537,10 @@
   <!-- MODAL 3: ADD APP TO MOBILE / HOMESCREEN MODAL                   -->
   <!-- ============================================================== -->
   <div id="installModal" class="hidden fixed inset-0 z-50 bg-dark-950/85 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-dark-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+    <div class="bg-dark-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-sm font-bold text-white flex items-center gap-2">
-          <span>📲</span> Add App to Mobile / Home Screen
+          <span>📲</span> Add to Mobile / Home Screen
         </h2>
         <button onclick="closeInstallModal()" class="text-slate-400 hover:text-slate-200 text-lg leading-none font-bold">✕</button>
       </div>
@@ -535,45 +550,45 @@
           &gt;_
         </div>
         <h3 class="font-bold text-white text-sm">Install Terminal App</h3>
-        <p class="text-xs text-slate-400">Access your laptops instantly from your phone's Home Screen &amp; Apps list like a native app (no browser search bars or desktop site mode).</p>
+        <p class="text-xs text-slate-400">Launch fullscreen from your phone like a native mobile app.</p>
       </div>
 
-      <!-- Android / Chrome Instructions -->
-      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs font-sans">
+      <!-- Android / Chrome -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-2 text-xs font-sans">
         <div class="font-bold text-emerald-400 flex items-center gap-1.5">
           <span>🤖</span> Android / Chrome:
         </div>
         <p class="text-slate-300 text-[11px]">
-          Tap the button below to add Terminal App directly to your Android Applications Drawer.
+          Tap below to install directly into your Applications drawer.
         </p>
-        <button id="directInstallBtn" onclick="triggerDirectInstall()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold font-mono text-xs rounded-lg transition shadow-md">
+        <button id="directInstallBtn" onclick="triggerDirectInstall()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold font-mono text-xs rounded-xl transition shadow-md">
           ⚡ Install App on Android
         </button>
       </div>
 
-      <!-- iPhone / iOS Safari Instructions -->
-      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs font-sans">
+      <!-- iPhone / Safari -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-2 text-xs font-sans">
         <div class="font-bold text-cyan-400 flex items-center gap-1.5">
           <span>🍎</span> iPhone / iPad (Safari):
         </div>
         <div class="text-slate-300 text-[11px] space-y-1.5">
           <div class="flex items-center gap-2">
             <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">1</span>
-            <span>Tap the <strong>Share</strong> button (box with up arrow) in Safari bottom bar.</span>
+            <span>Tap <strong>Share</strong> (box with up arrow) in Safari.</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">2</span>
-            <span>Scroll down and tap <strong>Add to Home Screen ➕</strong>.</span>
+            <span>Tap <strong>Add to Home Screen ➕</strong>.</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">3</span>
-            <span>Tap <strong>Add</strong> in the top right corner. Done!</span>
+            <span>Tap <strong>Add</strong> in top right.</span>
           </div>
         </div>
       </div>
 
       <div class="flex justify-end pt-2">
-        <button onclick="closeInstallModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono">
+        <button onclick="closeInstallModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono">
           Close
         </button>
       </div>
@@ -582,26 +597,26 @@
 
   <!-- MODAL 4: UPLOAD FILE -->
   <div id="uploadModal" class="hidden fixed inset-0 z-50 bg-dark-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-dark-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+    <div class="bg-dark-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <h3 class="text-sm font-bold text-white font-mono">Upload File to Remote Laptop</h3>
       <div class="space-y-2">
         <label class="block text-xs text-slate-400 font-mono">Target Remote Directory</label>
-        <input type="text" id="uploadDestPathInput" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200" readonly />
+        <input type="text" id="uploadDestPathInput" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200" readonly />
       </div>
       <div class="space-y-2">
         <label class="block text-xs text-slate-400 font-mono">Select Local File</label>
-        <input type="file" id="uploadFileInput" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-black cursor-pointer" />
+        <input type="file" id="uploadFileInput" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-black cursor-pointer" />
       </div>
       <div class="flex justify-end space-x-2 pt-2">
-        <button id="cancelUploadBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300">Cancel</button>
-        <button id="submitUploadBtn" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold font-mono text-black">Upload</button>
+        <button id="cancelUploadBtn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300">Cancel</button>
+        <button id="submitUploadBtn" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold font-mono text-black">Upload</button>
       </div>
     </div>
   </div>
 
   <!-- Mobile Bottom Navigation Bar -->
-  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur border-t border-slate-800 grid grid-cols-4 py-2 z-30 text-center font-medium text-[10px]">
-    <button onclick="switchTab('terminal')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="terminal">
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-4 py-2.5 z-30 text-center font-medium text-[10px]">
+    <button onclick="switchTab('terminal')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-emerald-400 font-bold" data-tab="terminal">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
       <span>Terminal</span>
     </button>
@@ -611,7 +626,7 @@
     </button>
     <button onclick="switchTab('health')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="health">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-      <span>Health</span>
+      <span>Health &amp; WoL</span>
     </button>
     <button onclick="switchTab('audit')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="audit">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
@@ -623,7 +638,7 @@
     // State & Constants
     const AUTH_STORAGE_KEY = 'terminal_relay_user_auth';
     let currentUser = null;
-    let authMode = 'login'; // 'login' or 'register'
+    let authMode = 'login';
     let ws = null;
     let devices = {};
     let selectedDeviceId = null;
@@ -698,7 +713,6 @@
       installModal.classList.add('hidden');
     }
 
-    // 1-Click .bat Installer Direct Download to Laptop Downloads folder
     function downloadBatInstaller() {
       const tok = currentUser ? currentUser.authToken : '';
       const url = `/api/download/installer.bat?token=${encodeURIComponent(tok)}`;
@@ -722,7 +736,6 @@
           if (parsed && parsed.authToken) {
             currentUser = parsed;
             updateUserUI();
-            // Validate with server
             const res = await fetch('/api/auth/me', {
               headers: { 'Authorization': 'Bearer ' + currentUser.authToken }
             });
@@ -755,12 +768,12 @@
       err.classList.add('hidden');
 
       if (mode === 'login') {
-        tabLogin.className = 'py-2 rounded-lg font-bold bg-slate-800 text-emerald-400 transition';
-        tabReg.className = 'py-2 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition';
+        tabLogin.className = 'py-2 rounded-xl font-bold bg-slate-800 text-emerald-400 transition';
+        tabReg.className = 'py-2 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition';
         submitBtn.textContent = 'Sign In';
       } else {
-        tabReg.className = 'py-2 rounded-lg font-bold bg-slate-800 text-emerald-400 transition';
-        tabLogin.className = 'py-2 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition';
+        tabReg.className = 'py-2 rounded-xl font-bold bg-slate-800 text-emerald-400 transition';
+        tabLogin.className = 'py-2 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition';
         submitBtn.textContent = 'Create Account';
       }
     }
@@ -854,10 +867,10 @@
         const isOnline = d.status === 'ONLINE';
         const mac = getDeviceMAC(d) || 'Auto-detecting...';
         const badge = isOnline
-          ? '<span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px]">ONLINE</span>'
-          : '<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">OFFLINE</span>';
+          ? '<span class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px]">ONLINE</span>'
+          : '<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px]">OFFLINE</span>';
         return `
-          <div class="p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
+          <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="text-base">${isOnline ? '🟢' : '🌙'}</span>
               <div>
@@ -909,7 +922,7 @@
       navigator.clipboard.writeText(text).then(() => {
         alert(successMsg);
       }).catch(() => {
-        prompt("Copy token manually:", text);
+        prompt("Copy text manually:", text);
       });
     }
 
@@ -919,6 +932,25 @@
         return;
       }
       copyToClipboard(currentUser.authToken, "✅ Account Pairing Token copied!\n\nPaste this token into scripts\\install-startup-agent.bat when prompted.");
+    }
+
+    function copyCurrentMac() {
+      const mac = document.getElementById('heroMacText').textContent;
+      if (mac && mac !== 'Detecting...' && mac !== 'Not reported') {
+        copyToClipboard(mac, `MAC Address ${mac} copied!`);
+      } else {
+        alert("MAC address is currently detecting. Start the agent on your laptop.");
+      }
+    }
+
+    function triggerQuickWoL() {
+      const mac = document.getElementById('heroMacText').textContent;
+      if (mac && mac !== 'Detecting...' && mac !== 'Not reported') {
+        document.getElementById('wolMacInput').value = mac;
+        document.getElementById('sendWolBtn').click();
+      } else {
+        switchTab('health');
+      }
     }
 
     // ==============================================================
@@ -1008,8 +1040,11 @@
         case 'DEVICE_STATUS':
           if (env.payload) {
             const devId = env.payload.deviceId;
-            if (devices[devId]) devices[devId].status = env.payload.status;
-            else devices[devId] = { deviceId: devId, status: env.payload.status, metrics: {} };
+            if (devices[devId]) {
+              devices[devId].status = env.payload.status;
+            } else {
+              devices[devId] = { deviceId: devId, status: env.payload.status, metrics: {} };
+            }
             populateDeviceSelector();
             renderUserLaptopsList();
           }
@@ -1024,6 +1059,14 @@
               }
               devices[devId].status = 'ONLINE';
               devices[devId].lastHeartbeat = Math.floor(Date.now()/1000);
+            } else {
+              devices[devId] = {
+                deviceId: devId,
+                status: 'ONLINE',
+                lastHeartbeat: Math.floor(Date.now()/1000),
+                metrics: env.payload.metrics || {},
+                macAddress: (env.payload.metrics ? env.payload.metrics.macAddress : '')
+              };
             }
             populateDeviceSelector();
             renderUserLaptopsList();
@@ -1062,7 +1105,7 @@
     function populateDeviceSelector() {
       const devArray = Object.values(devices);
       if (devArray.length === 0) {
-        deviceSelector.innerHTML = '<option value="">(No Devices)</option>';
+        deviceSelector.innerHTML = '<option value="">(No Devices Detected)</option>';
         updateHeaderStatus();
         return;
       }
@@ -1071,7 +1114,7 @@
       deviceSelector.innerHTML = devArray.map(d => {
         const icon = d.status === 'ONLINE' ? '🟢' : '🌙';
         const mac = getDeviceMAC(d);
-        const macTag = mac ? ` [MAC: ${mac}]` : '';
+        const macTag = mac ? ` [${mac}]` : '';
         return `<option value="${d.deviceId}" ${d.deviceId === prev ? 'selected' : ''}>${icon} ${d.deviceId}${macTag} (${d.status || 'OFFLINE'})</option>`;
       }).join('');
 
@@ -1091,36 +1134,49 @@
 
     function updateHeaderStatus() {
       const d = devices[selectedDeviceId];
-      const dot = document.getElementById('activeDevStatusDot');
-      const title = document.getElementById('activeDevHeaderTitle');
+      const nameEl = document.getElementById('activeDevNameDisplay');
+      const badgeEl = document.getElementById('activeDevStatusBadge');
+      const osEl = document.getElementById('activeDevOsDisplay');
+      const lastSeenEl = document.getElementById('activeDevLastSeen');
+      const heroMacEl = document.getElementById('heroMacText');
       const wolInput = document.getElementById('wolMacInput');
       const currentMacDisplay = document.getElementById('currentMacDisplay');
       const macTextDisplay = document.getElementById('macTextDisplay');
 
       if (!d) {
-        dot.className = 'w-2 h-2 rounded-full bg-slate-600';
-        title.textContent = 'No device paired';
+        nameEl.textContent = 'No Laptop Connected';
+        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-slate-800 text-slate-400 border border-slate-700';
+        badgeEl.textContent = 'OFFLINE';
+        osEl.textContent = 'Run scripts\\install-startup-agent.bat';
+        lastSeenEl.textContent = 'Waiting for connection';
+        heroMacEl.textContent = 'Not reported';
         if (macTextDisplay) macTextDisplay.textContent = '--';
         if (currentMacDisplay) currentMacDisplay.textContent = '--';
         return;
       }
 
-      const mac = getDeviceMAC(d) || 'Auto-detecting...';
-      title.textContent = `${d.deviceId} • ${d.hostname || 'Windows PC'} • MAC: ${mac}`;
+      nameEl.textContent = d.deviceId;
+      osEl.textContent = d.hostname ? `${d.hostname} (${d.os || 'Windows'})` : (d.os || 'Windows PC');
+
+      const isOnline = d.status === 'ONLINE';
+      if (isOnline) {
+        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 animate-pulse';
+        badgeEl.textContent = '🟢 ONLINE';
+        lastSeenEl.textContent = 'Connected Live';
+      } else {
+        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-950 text-amber-400 border border-amber-800';
+        badgeEl.textContent = '🌙 ASLEEP';
+        lastSeenEl.textContent = d.lastHeartbeat ? `Last seen ${formatTimeAgo(d.lastHeartbeat)}` : 'Sleeping (Queue Ready)';
+      }
+
+      const mac = getDeviceMAC(d) || 'Detecting...';
+      heroMacEl.textContent = mac;
       
       if (wolInput && getDeviceMAC(d)) {
         wolInput.value = getDeviceMAC(d);
       }
-      if (currentMacDisplay) {
-        currentMacDisplay.textContent = mac;
-      }
-      if (macTextDisplay) {
-        macTextDisplay.textContent = mac;
-      }
-
-      if (d.status === 'ONLINE') dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
-      else if (d.status === 'DEGRADED') dot.className = 'w-2 h-2 rounded-full bg-amber-400';
-      else dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+      if (currentMacDisplay) currentMacDisplay.textContent = mac;
+      if (macTextDisplay) macTextDisplay.textContent = mac;
     }
 
     function updateTelemetry() {
@@ -1151,7 +1207,7 @@
     }
 
     // ==============================================================
-    // TERMINAL COMMAND EXECUTION (WORKS ONLINE & OFFLINE)
+    // TERMINAL COMMAND EXECUTION
     // ==============================================================
 
     function appendConsole(text, colorClass = 'text-slate-200') {
@@ -1164,22 +1220,22 @@
 
     function renderCommandResult(res) {
       const box = document.createElement('div');
-      box.className = 'p-2.5 my-1.5 rounded-lg bg-slate-900 border ' + (res.exitCode === 0 ? 'border-emerald-800/60' : 'border-red-800/60');
+      box.className = 'p-3 my-1.5 rounded-2xl bg-slate-900/90 border ' + (res.exitCode === 0 ? 'border-emerald-800/60' : 'border-red-800/60') + ' shadow-md';
       const ts = new Date(res.executedAt * 1000).toLocaleTimeString();
       const exitBadge = res.exitCode === 0 
-        ? '<span class="px-1 py-0.5 rounded bg-emerald-950 text-emerald-400 text-[10px] font-bold">Exit: 0</span>'
-        : `<span class="px-1 py-0.5 rounded bg-red-950 text-red-400 text-[10px] font-bold">Exit: ${res.exitCode}</span>`;
+        ? '<span class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 text-[10px] font-bold">Exit: 0</span>'
+        : `<span class="px-2 py-0.5 rounded-full bg-red-950 text-red-400 text-[10px] font-bold">Exit: ${res.exitCode}</span>`;
 
       box.innerHTML = `
-        <div class="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-800 pb-1 mb-1.5 font-mono">
+        <div class="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-800 pb-1 mb-2 font-mono">
           <span>Command: <code class="text-slate-200">${res.commandId.slice(0, 8)}</code></span>
           <div class="flex items-center gap-2">
             ${exitBadge}
             <span>${ts}</span>
           </div>
         </div>
-        ${res.stdout ? `<pre class="text-emerald-300 font-mono text-xs whitespace-pre-wrap">${escapeHtml(res.stdout)}</pre>` : ''}
-        ${res.stderr ? `<pre class="text-red-400 font-mono text-xs whitespace-pre-wrap mt-1">${escapeHtml(res.stderr)}</pre>` : ''}
+        ${res.stdout ? `<pre class="text-emerald-300 font-mono text-xs whitespace-pre-wrap leading-relaxed">${escapeHtml(res.stdout)}</pre>` : ''}
+        ${res.stderr ? `<pre class="text-red-400 font-mono text-xs whitespace-pre-wrap mt-1 leading-relaxed">${escapeHtml(res.stderr)}</pre>` : ''}
       `;
       terminalOutput.appendChild(box);
       terminalOutput.scrollTop = terminalOutput.scrollHeight;
@@ -1188,7 +1244,7 @@
     function executeCommand(cmd) {
       if (!cmd) return;
       if (!selectedDeviceId) {
-        alert("Please pair and select a target laptop first.");
+        alert("Please select or pair a target laptop first.");
         return;
       }
       cmdHistory.push(cmd);
@@ -1198,7 +1254,7 @@
       const d = devices[selectedDeviceId];
       const isOffline = !d || d.status !== 'ONLINE';
       if (isOffline) {
-        appendConsole(`⚡ [QUEUED IN CLOUD — LAPTOP OFFLINE] Command stored in cloud queue. It will automatically execute on ${selectedDeviceId} the moment it powers on.`, 'text-amber-400 text-[11px]');
+        appendConsole(`⚡ [QUEUED IN CLOUD — LAPTOP ASLEEP] Command stored in persistent queue. It will automatically execute on ${selectedDeviceId} when powered on.`, 'text-amber-400 text-[11px]');
       }
 
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1218,6 +1274,12 @@
       }
     }
 
+    function insertAndRun(cmd) {
+      cmdInput.value = cmd;
+      executeCommand(cmd);
+      cmdInput.value = '';
+    }
+
     commandForm.onsubmit = (e) => {
       e.preventDefault();
       const val = cmdInput.value.trim();
@@ -1231,7 +1293,7 @@
       btn.onclick = () => {
         const cmd = btn.dataset.cmd;
         if (cmd === 'wake') {
-          switchTab('health');
+          triggerQuickWoL();
           return;
         }
         executeCommand(cmd);
@@ -1242,7 +1304,6 @@
       terminalOutput.innerHTML = '<div class="text-slate-500 font-mono text-xs">[Console Cleared]</div>';
     };
 
-    // Toggle Predefined Grid
     document.getElementById('togglePredefBtn').onclick = () => {
       const grid = document.getElementById('predefGrid');
       grid.classList.toggle('hidden');
@@ -1278,16 +1339,14 @@
 
       filesTableBody.innerHTML = files.map(f => {
         const icon = f.isDir ? '📁' : '📄';
-        const clickAction = f.isDir 
-          ? `onclick="loadFiles('${escapeJsStr(f.path)}')"`
-          : '';
+        const clickAction = f.isDir ? `onclick="loadFiles('${escapeJsStr(f.path)}')"` : '';
         const nameClass = f.isDir ? 'text-emerald-400 font-bold hover:underline cursor-pointer' : 'text-slate-200';
         const sizeStr = f.isDir ? '--' : formatBytes(f.sizeBytes);
         const modStr = new Date(f.modTime * 1000).toLocaleDateString();
 
         const actions = f.isDir ? '' : `
-          <button onclick="downloadFile('${escapeJsStr(f.path)}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-[10px]">⬇ Download</button>
-          <button onclick="deleteFile('${escapeJsStr(f.path)}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-red-950 text-red-400 border border-slate-700 text-[10px] ml-1">🗑</button>
+          <button onclick="downloadFile('${escapeJsStr(f.path)}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-[10px]">⬇ Download</button>
+          <button onclick="deleteFile('${escapeJsStr(f.path)}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-red-950 text-red-400 border border-slate-700 text-[10px] ml-1">🗑</button>
         `;
 
         return `
@@ -1412,7 +1471,7 @@
             <td class="p-2 font-bold text-slate-200 font-mono">${escapeHtml(p.name)}</td>
             <td class="p-2 text-slate-400 font-mono">${memMb} MB</td>
             <td class="p-2 text-right">
-              <button onclick="killProcess(${p.pid})" class="px-2 py-0.5 rounded bg-red-950 hover:bg-red-900 text-red-400 border border-red-800 text-[10px] font-mono">Kill</button>
+              <button onclick="killProcess(${p.pid})" class="px-2.5 py-1 rounded-lg bg-red-950 hover:bg-red-900 text-red-400 border border-red-800 text-[10px] font-mono">Kill</button>
             </td>
           </tr>
         `;
@@ -1513,6 +1572,13 @@
       if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
       if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
       return (b/(1024*1024*1024)).toFixed(1) + ' GB';
+    }
+
+    function formatTimeAgo(tsSec) {
+      const diff = Math.floor(Date.now()/1000) - tsSec;
+      if (diff < 60) return `${diff}s ago`;
+      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+      return `${Math.floor(diff/3600)}h ago`;
     }
 
     function escapeHtml(str) {

@@ -290,6 +290,9 @@ func (s *Store) ListDevices() ([]protocol.DeviceInfo, error) {
 		if healthStr.Valid && healthStr.String != "" {
 			_ = json.Unmarshal([]byte(healthStr.String), &d.Metrics)
 		}
+		if d.Metrics.MACAddress != "" {
+			d.MACAddress = d.Metrics.MACAddress
+		}
 		list = append(list, d)
 	}
 	return list, rows.Err()
@@ -420,6 +423,9 @@ func (s *Store) ListDevicesForUser(userID string) ([]protocol.DeviceInfo, error)
 		}
 		if healthStr.Valid && healthStr.String != "" {
 			_ = json.Unmarshal([]byte(healthStr.String), &d.Metrics)
+		}
+		if d.Metrics.MACAddress != "" {
+			d.MACAddress = d.Metrics.MACAddress
 		}
 		list = append(list, d)
 	}

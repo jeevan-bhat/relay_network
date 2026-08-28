@@ -276,6 +276,9 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 			LastHeartbeat: time.Now().Unix(),
 			ConnectedAt:   time.Now().Unix(),
 		}
+		if devInfo.MACAddress != "" {
+			devInfo.Metrics.MACAddress = devInfo.MACAddress
+		}
 		if authenticatedUser != nil {
 			devInfo.UserID = authenticatedUser.UserID
 			_ = h.store.BindDeviceToUser(p.DeviceID, authenticatedUser.UserID)
@@ -478,7 +481,8 @@ func (h *Hub) GetDevicesForUser(userID string) []protocol.DeviceInfo {
 	var devices []protocol.DeviceInfo
 	if userID != "" {
 		devices, _ = h.store.ListDevicesForUser(userID)
-	} else {
+	}
+	if len(devices) == 0 {
 		devices, _ = h.store.ListDevices()
 	}
 	if devices == nil {
@@ -496,7 +500,7 @@ func (h *Hub) GetDevicesForUser(userID string) []protocol.DeviceInfo {
 		}
 	}
 	for devID, agentClient := range h.agents {
-		if !devMap[devID] && (userID == "" || agentClient.userID == "" || agentClient.userID == userID) {
+		if !devMap[devID] {
 			devices = append(devices, protocol.DeviceInfo{
 				DeviceID:      devID,
 				UserID:        agentClient.userID,

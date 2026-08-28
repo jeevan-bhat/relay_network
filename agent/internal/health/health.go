@@ -4,7 +4,9 @@ package health
 
 import (
 	"net"
+	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -26,6 +28,8 @@ var (
 	lastUser     uint64
 	lastSampled  time.Time
 	lastCPUUsage float64
+	cachedMAC    string
+	cachedMACMu  sync.RWMutex
 )
 
 type memorystatusex struct {
@@ -51,23 +55,60 @@ func (ft filetime) toUint64() uint64 {
 
 // GetPrimaryMACAddress returns the physical MAC address of the active network adapter.
 func GetPrimaryMACAddress() string {
+	cachedMACMu.RLock()
+	if cachedMAC != "" {
+		defer cachedMACMu.RUnlock()
+		return cachedMAC
+	}
+	cachedMACMu.RUnlock()
+
+	mac := ""
 	interfaces, err := net.Interfaces()
-	if err != nil {
-		return ""
-	}
-	// Prefer non-loopback up interfaces with 6-byte hardware address
-	for _, iface := range interfaces {
-		if iface.Flags&net.FlagLoopback == 0 && iface.Flags&net.FlagUp != 0 && len(iface.HardwareAddr) == 6 {
-			return iface.HardwareAddr.String()
+	if err == nil {
+		// Prefer non-loopback up interfaces with 6-byte hardware address
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagLoopback == 0 && iface.Flags&net.FlagUp != 0 && len(iface.HardwareAddr) == 6 {
+				mac = strings.ToUpper(iface.HardwareAddr.String())
+				break
+			}
+		}
+		// Fallback to any non-empty hardware address
+		if mac == "" {
+			for _, iface := range interfaces {
+				if len(iface.HardwareAddr) == 6 && iface.Flags&net.FlagLoopback == 0 {
+					mac = strings.ToUpper(iface.HardwareAddr.String())
+					break
+				}
+			}
 		}
 	}
-	// Fallback to any non-empty hardware address
-	for _, iface := range interfaces {
-		if len(iface.HardwareAddr) == 6 && iface.Flags&net.FlagLoopback == 0 {
-			return iface.HardwareAddr.String()
+
+	// Fallback for Windows if net.Interfaces returned empty
+	if mac == "" && runtime.GOOS == "windows" {
+		out, err := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "(Get-NetAdapter | Where-Object Status -eq 'Up' | Select-Object -First 1 -ExpandProperty MacAddress)").Output()
+		if err == nil {
+			m := strings.TrimSpace(string(out))
+			if m != "" {
+				mac = strings.ToUpper(strings.ReplaceAll(m, "-", ":"))
+			}
+		}
+		if mac == "" {
+			out, err = exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "(Get-NetAdapter | Select-Object -First 1 -ExpandProperty MacAddress)").Output()
+			if err == nil {
+				m := strings.TrimSpace(string(out))
+				if m != "" {
+					mac = strings.ToUpper(strings.ReplaceAll(m, "-", ":"))
+				}
+			}
 		}
 	}
-	return ""
+
+	if mac != "" {
+		cachedMACMu.Lock()
+		cachedMAC = mac
+		cachedMACMu.Unlock()
+	}
+	return mac
 }
 
 // Collect returns a snapshot of current system health metrics.

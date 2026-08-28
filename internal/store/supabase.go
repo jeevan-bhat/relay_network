@@ -303,6 +303,9 @@ func (s *SupabaseStore) GetDevice(deviceID string) (*protocol.DeviceInfo, error)
 	if d.HealthJSON != "" {
 		_ = json.Unmarshal([]byte(d.HealthJSON), &dev.Metrics)
 	}
+	if dev.Metrics.MACAddress != "" {
+		dev.MACAddress = dev.Metrics.MACAddress
+	}
 	return &dev, nil
 }
 
@@ -328,6 +331,9 @@ func (s *SupabaseStore) ListDevices() ([]protocol.DeviceInfo, error) {
 		}
 		if d.HealthJSON != "" {
 			_ = json.Unmarshal([]byte(d.HealthJSON), &dev.Metrics)
+		}
+		if dev.Metrics.MACAddress != "" {
+			dev.MACAddress = dev.Metrics.MACAddress
 		}
 		result = append(result, dev)
 	}
@@ -357,6 +363,9 @@ func (s *SupabaseStore) ListDevicesForUser(userID string) ([]protocol.DeviceInfo
 		}
 		if d.HealthJSON != "" {
 			_ = json.Unmarshal([]byte(d.HealthJSON), &dev.Metrics)
+		}
+		if dev.Metrics.MACAddress != "" {
+			dev.MACAddress = dev.Metrics.MACAddress
 		}
 		result = append(result, dev)
 	}
