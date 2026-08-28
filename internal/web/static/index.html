@@ -2,8 +2,19 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Terminal App — Remote Administration & Mobile Controller</title>
+  
+  <!-- Progressive Web App (PWA) Meta & Icons -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#020617">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Terminal App">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icon.svg">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -27,13 +38,22 @@
     .terminal-scroll::-webkit-scrollbar-track { background: #0f172a; }
     .terminal-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
     button, input, select { touch-action: manipulation; }
+    /* Standalone PWA Optimizations */
+    @media all and (display-mode: standalone) {
+      body {
+        -webkit-user-select: none;
+        user-select: none;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+    }
   </style>
 </head>
 <body class="bg-dark-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-black pb-16 md:pb-0">
 
   <!-- Top App Bar -->
-  <header class="bg-dark-900/95 backdrop-blur border-b border-slate-800 px-4 py-2.5 flex items-center justify-between sticky top-0 z-40">
-    <div class="flex items-center space-x-3">
+  <header class="bg-dark-900/95 backdrop-blur border-b border-slate-800 px-3 sm:px-4 py-2.5 flex items-center justify-between sticky top-0 z-40">
+    <div class="flex items-center space-x-2.5">
       <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center font-mono font-bold text-black text-sm shadow-md shadow-brand-500/20">
         &gt;_
       </div>
@@ -48,18 +68,23 @@
       </div>
     </div>
 
-    <!-- User Profile, Device Picker & Relay Badge -->
-    <div class="flex items-center space-x-2 text-xs font-mono">
-      <select id="deviceSelector" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 max-w-[140px] sm:max-w-none truncate">
+    <!-- User Profile, Add App to Mobile, Device Picker & Relay Badge -->
+    <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs font-mono">
+      <select id="deviceSelector" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-emerald-500 max-w-[120px] sm:max-w-none truncate">
         <option value="">(No Devices)</option>
       </select>
+
+      <button id="addMobileAppBtn" onclick="triggerInstallApp()" class="flex items-center gap-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-bold border border-emerald-500/60 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-sans transition shadow-md shadow-brand-500/20" title="Add App to Mobile / Home Screen">
+        <span>📲</span>
+        <span class="hidden sm:inline">Add App to Mobile</span>
+      </button>
 
       <button id="userProfileBtn" onclick="openAccountModal()" class="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-sans transition">
         <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
         <span id="userProfileName" class="font-semibold">Account</span>
       </button>
 
-      <div id="relayBadge" class="hidden sm:flex items-center space-x-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
+      <div id="relayBadge" class="hidden md:flex items-center space-x-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
         <span id="relayStatusDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
         <span id="relayStatusText" class="text-[11px] text-slate-300">Connecting...</span>
       </div>
@@ -89,7 +114,7 @@
   <!-- Main Viewports -->
   <main class="flex-1 max-w-[1400px] w-full mx-auto p-3 sm:p-5 flex flex-col space-y-4">
 
-    <!-- Account Token Pairing Banner -->
+    <!-- 1-Click Laptop Installer & Account Pairing Banner -->
     <div id="pairBanner" class="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-800/40 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
       <div class="flex items-center space-x-3">
         <div class="w-8 h-8 rounded-lg bg-emerald-900/60 border border-emerald-700/50 flex items-center justify-center text-emerald-400 font-bold text-sm">
@@ -97,16 +122,19 @@
         </div>
         <div>
           <h2 class="text-xs font-bold text-white flex items-center gap-2">
-            Pair Your Windows Laptop <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-900/80 text-emerald-300 border border-emerald-700">Account Active</span>
+            Pair Windows Laptop <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-900/80 text-emerald-300 border border-emerald-700">Account Active</span>
           </h2>
           <p class="text-[11px] text-slate-300">
-            Paste your unique pairing token into <code class="text-emerald-400 font-mono">scripts\install-startup-agent.bat</code> to connect your laptop.
+            Download the 1-click installer to your laptop or copy your account pairing token.
           </p>
         </div>
       </div>
-      <div class="flex items-center gap-2 w-full sm:w-auto">
+      <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <button onclick="downloadBatInstaller()" class="flex-1 sm:flex-none px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-black font-mono font-bold text-xs rounded-lg transition shadow-md flex items-center justify-center gap-1.5">
+          <span>⬇️</span> <span>Download .bat Installer</span>
+        </button>
         <button onclick="copyPairingToken()" class="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-mono font-bold text-xs rounded-lg transition shadow-md flex items-center justify-center gap-1.5">
-          <span>📋</span> <span id="copyTokenBtnText">Copy Pairing Token</span>
+          <span>📋</span> <span id="copyTokenBtnText">Copy Token</span>
         </button>
         <button onclick="openAccountModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs rounded-lg transition">
           Credentials
@@ -451,12 +479,22 @@
         </div>
       </div>
 
+      <!-- Action Buttons (Download .bat & Add App to Mobile) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-xs">
+        <button onclick="downloadBatInstaller()" class="p-2.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 rounded-xl text-cyan-300 flex items-center justify-center gap-2 font-bold transition">
+          <span>⬇️</span> Download .bat Installer
+        </button>
+        <button onclick="triggerInstallApp()" class="p-2.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 rounded-xl text-emerald-300 flex items-center justify-center gap-2 font-bold transition">
+          <span>📲</span> Add App to Mobile
+        </button>
+      </div>
+
       <!-- Pairing Guide Card -->
       <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-300 space-y-1.5 font-mono">
-        <div class="font-bold text-amber-400 flex items-center gap-1">⚡ How to Pair a New Windows Laptop:</div>
-        <p>1. On your laptop, right-click <code class="text-emerald-400">scripts\install-startup-agent.bat</code> and run.</p>
-        <p>2. Paste your Pairing Token when prompted.</p>
-        <p>3. Your laptop will connect invisibly in the background and appear in this dashboard!</p>
+        <div class="font-bold text-amber-400 flex items-center gap-1">⚡ Quick Setup on Windows Laptop:</div>
+        <p>1. Tap <span class="text-cyan-400 font-bold">Download .bat Installer</span> above (downloads to your Downloads folder).</p>
+        <p>2. Double-click the downloaded <code class="text-emerald-400">install-startup-agent.bat</code> file on your laptop.</p>
+        <p>3. Your laptop will automatically connect in the background and appear in this dashboard!</p>
       </div>
 
       <!-- Paired Laptops List -->
@@ -480,7 +518,69 @@
     </div>
   </div>
 
-  <!-- MODAL 3: UPLOAD FILE -->
+  <!-- ============================================================== -->
+  <!-- MODAL 3: ADD APP TO MOBILE / HOMESCREEN MODAL                   -->
+  <!-- ============================================================== -->
+  <div id="installModal" class="hidden fixed inset-0 z-50 bg-dark-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-dark-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>📲</span> Add App to Mobile / Home Screen
+        </h2>
+        <button onclick="closeInstallModal()" class="text-slate-400 hover:text-slate-200 text-lg leading-none font-bold">✕</button>
+      </div>
+
+      <div class="text-center py-2 space-y-2">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 mx-auto flex items-center justify-center font-mono font-bold text-black text-2xl shadow-xl shadow-brand-500/20">
+          &gt;_
+        </div>
+        <h3 class="font-bold text-white text-sm">Install Terminal App</h3>
+        <p class="text-xs text-slate-400">Access your laptops instantly from your phone's Home Screen &amp; Apps list like a native app (no browser search bars or desktop site mode).</p>
+      </div>
+
+      <!-- Android / Chrome Instructions -->
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs font-sans">
+        <div class="font-bold text-emerald-400 flex items-center gap-1.5">
+          <span>🤖</span> Android / Chrome:
+        </div>
+        <p class="text-slate-300 text-[11px]">
+          Tap the button below to add Terminal App directly to your Android Applications Drawer.
+        </p>
+        <button id="directInstallBtn" onclick="triggerDirectInstall()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold font-mono text-xs rounded-lg transition shadow-md">
+          ⚡ Install App on Android
+        </button>
+      </div>
+
+      <!-- iPhone / iOS Safari Instructions -->
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs font-sans">
+        <div class="font-bold text-cyan-400 flex items-center gap-1.5">
+          <span>🍎</span> iPhone / iPad (Safari):
+        </div>
+        <div class="text-slate-300 text-[11px] space-y-1.5">
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">1</span>
+            <span>Tap the <strong>Share</strong> button (box with up arrow) in Safari bottom bar.</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">2</span>
+            <span>Scroll down and tap <strong>Add to Home Screen ➕</strong>.</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">3</span>
+            <span>Tap <strong>Add</strong> in the top right corner. Done!</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeInstallModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: UPLOAD FILE -->
   <div id="uploadModal" class="hidden fixed inset-0 z-50 bg-dark-950/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-dark-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <h3 class="text-sm font-bold text-white font-mono">Upload File to Remote Laptop</h3>
@@ -531,10 +631,12 @@
     let cmdHistory = [];
     let historyIdx = -1;
     let currentPath = 'C:\\';
+    let deferredPrompt = null;
 
     // DOM Elements
     const authModal = document.getElementById('authModal');
     const accountModal = document.getElementById('accountModal');
+    const installModal = document.getElementById('installModal');
     const deviceSelector = document.getElementById('deviceSelector');
     const userProfileName = document.getElementById('userProfileName');
     const relayDot = document.getElementById('relayStatusDot');
@@ -547,6 +649,66 @@
     const auditTableBody = document.getElementById('auditTableBody');
     const filePathInput = document.getElementById('filePathInput');
     const uploadModal = document.getElementById('uploadModal');
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration skipped:', err));
+      });
+    }
+
+    // Capture PWA Install Prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+    });
+
+    function triggerInstallApp() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            deferredPrompt = null;
+          }
+        });
+      } else {
+        openInstallModal();
+      }
+    }
+
+    function triggerDirectInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            deferredPrompt = null;
+            closeInstallModal();
+          }
+        });
+      } else {
+        alert("To install, tap your browser's menu (⋮) and choose 'Add to Home screen' or 'Install App'.");
+      }
+    }
+
+    function openInstallModal() {
+      installModal.classList.remove('hidden');
+    }
+
+    function closeInstallModal() {
+      installModal.classList.add('hidden');
+    }
+
+    // 1-Click .bat Installer Direct Download to Laptop Downloads folder
+    function downloadBatInstaller() {
+      const tok = currentUser ? currentUser.authToken : '';
+      const url = `/api/download/installer.bat?token=${encodeURIComponent(tok)}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'install-startup-agent.bat';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
 
     // ==============================================================
     // AUTHENTICATION & USER MANAGEMENT

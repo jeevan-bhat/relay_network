@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="darkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+  </defs>
+  <!-- Background Squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#darkGrad)" />
+  <!-- Inner Glow Border -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="url(#brandGrad)" stroke-width="12" opacity="0.6" />
+  <!-- Terminal Prompt Symbol >_ -->
+  <g fill="url(#brandGrad)">
+    <!-- Greater Than Chevron > -->
+    <path d="M 120 160 L 240 256 L 120 352 L 150 384 L 290 256 L 150 128 Z" />
+    <!-- Underscore Cursor _ -->
+    <rect x="280" y="340" width="120" height="36" rx="8" />
+  </g>
+</svg>

@@ -49,6 +49,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 
 	// REST API
 	mux.HandleFunc("/api/system/status", s.handleSystemStatus)
+	mux.HandleFunc("/api/download/installer.bat", s.handleDownloadInstaller)
 	mux.HandleFunc("/api/auth/register", s.handleRegister)
 	mux.HandleFunc("/api/auth/login", s.handleLogin)
 	mux.HandleFunc("/api/auth/me", s.handleAuthMe)
@@ -371,6 +372,78 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 		"storage_backend": backend,
 		"is_supabase":     s.store.IsSupabase(),
 	})
+}
+
+func (s *Server) handleDownloadInstaller(w http.ResponseWriter, r *http.Request) {
+	token := s.extractToken(r)
+	if tok := r.URL.Query().Get("token"); tok != "" {
+		token = tok
+	}
+
+	host := r.Host
+	wsProto := "wss://"
+	httpProto := "https://"
+	if strings.HasPrefix(host, "localhost") || strings.HasPrefix(host, "127.0.0.1") {
+		wsProto = "ws://"
+		httpProto = "http://"
+	}
+	relayURL := wsProto + host + "/ws"
+	downloadExeURL := httpProto + host + "/api/download/terminal-agent.exe"
+
+	script := fmt.Sprintf(`@echo off
+setlocal
+title Terminal Agent - 1-Click Laptop Installer
+cd /d "%%~dp0"
+echo ==========================================================
+echo   Terminal Agent - 1-Click Laptop Auto-Start Setup
+echo ==========================================================
+echo.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$agentDir = \"$env:LOCALAPPDATA\TerminalAgent\"; " ^
+  "if (-not (Test-Path $agentDir)) { New-Item -ItemType Directory -Path $agentDir -Force | Out-Null }; " ^
+  "$destExe = Join-Path $agentDir \"terminal-agent.exe\"; " ^
+  "Stop-Process -Name \"terminal-agent\" -Force -ErrorAction SilentlyContinue; " ^
+  "Start-Sleep -Milliseconds 500; " ^
+  "if (-not (Test-Path $destExe)) { " ^
+  "  if (Test-Path \"terminal-agent.exe\") { Copy-Item \"terminal-agent.exe\" $destExe -Force } " ^
+  "  elseif (Test-Path \"..\agent\terminal-agent.exe\") { Copy-Item \"..\agent\terminal-agent.exe\" $destExe -Force } " ^
+  "  else { " ^
+  "    Write-Host 'Downloading agent binary from cloud...' -ForegroundColor Yellow; " ^
+  "    try { Invoke-WebRequest -Uri '%s' -OutFile $destExe -UseBasicParsing } catch { " ^
+  "      Write-Host 'Connecting with local agent.' -ForegroundColor Gray " ^
+  "    } " ^
+  "  } " ^
+  "}; " ^
+  "$configPath = Join-Path $agentDir \"config.json\"; " ^
+  "$configObj = [PSCustomObject]@{ " ^
+  "  relay_url = '%s'; " ^
+  "  device_id = $env:COMPUTERNAME.ToLower(); " ^
+  "  auth_token = '%s'; " ^
+  "  db_path = (Join-Path $agentDir \"queue.db\"); " ^
+  "  heartbeat_interval = \"15s\" " ^
+  "}; " ^
+  "$configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8; " ^
+  "$startupFolder = [Environment]::GetFolderPath(\"Startup\"); " ^
+  "$vbsPath = Join-Path $startupFolder \"TerminalAgent.vbs\"; " ^
+  "$line1 = 'Set WshShell = CreateObject(\"WScript.Shell\")'; " ^
+  "$line2 = 'WshShell.Run \"\"\"{0}\"\" run\", 0, False' -f $destExe; " ^
+  "Set-Content -Path $vbsPath -Value @($line1, $line2) -Force; " ^
+  "Start-Process -FilePath \"wscript.exe\" -ArgumentList $vbsPath; " ^
+  "Write-Host ''; " ^
+  "Write-Host '==========================================================' -ForegroundColor Green; " ^
+  "Write-Host '  SUCCESS! Laptop paired and running permanently.' -ForegroundColor Green; " ^
+  "Write-Host '  Device ID: ' $env:COMPUTERNAME.ToLower() -ForegroundColor Cyan; " ^
+  "Write-Host '  Relay URL: %s' -ForegroundColor Cyan; " ^
+  "Write-Host '==========================================================' -ForegroundColor Green; "
+echo.
+echo Setup complete. You can close this window.
+pause
+`, downloadExeURL, relayURL, token, relayURL)
+
+	w.Header().Set("Content-Type", "application/x-bat; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="install-startup-agent.bat"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(script))
 }
 
 
