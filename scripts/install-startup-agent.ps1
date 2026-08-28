@@ -98,15 +98,20 @@ try {
 
 # 4. Create Invisible Startup Launcher in Windows Startup Folder
 $startupFolder = [Environment]::GetFolderPath("Startup")
-$vbsPath = Join-Path $startupFolder "TerminalAgent.vbs"
-$line1 = 'Set WshShell = CreateObject("WScript.Shell")'
-$line2 = 'WshShell.Run """{0}"" run", 0, False' -f $destExe
-Set-Content -Path $vbsPath -Value @($line1, $line2) -Force
-Write-Host "[OK] Registered in Windows Startup: $vbsPath" -ForegroundColor Green
+$shortcutPath = Join-Path $startupFolder "TerminalAgent.lnk"
+try {
+    $wsh = New-Object -ComObject WScript.Shell
+    $sc = $wsh.CreateShortcut($shortcutPath)
+    $sc.TargetPath = $destExe
+    $sc.Arguments = "run"
+    $sc.WindowStyle = 7
+    $sc.Save()
+    Write-Host "[OK] Registered in Windows Startup: $shortcutPath" -ForegroundColor Green
+} catch {}
 
 # 5. Launch immediately in background
 Write-Host "Starting agent in background..." -ForegroundColor Yellow
-Start-Process -FilePath "wscript.exe" -ArgumentList $vbsPath
+Start-Process -FilePath $destExe -ArgumentList "run" -WindowStyle Hidden
 
 Start-Sleep -Seconds 2
 

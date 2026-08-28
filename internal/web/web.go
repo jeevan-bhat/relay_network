@@ -425,14 +425,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
   "  auth_token = '%s'; " ^
   "  db_path = (Join-Path $agentDir \"queue.db\"); " ^
   "  heartbeat_interval = \"15s\" " ^
-  "}; " ^
   "$configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8; " ^
+  "try { $configObj | ConvertTo-Json -Depth 4 | Set-Content -Path \"C:\ProgramData\TerminalAgent\config.json\" -Force -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}; " ^
   "$startupFolder = [Environment]::GetFolderPath(\"Startup\"); " ^
-  "$vbsPath = Join-Path $startupFolder \"TerminalAgent.vbs\"; " ^
-  "$line1 = 'Set WshShell = CreateObject(\"WScript.Shell\")'; " ^
-  "$line2 = 'WshShell.Run \"\"\"{0}\"\" run\", 0, False' -f $destExe; " ^
-  "Set-Content -Path $vbsPath -Value @($line1, $line2) -Force; " ^
-  "Start-Process -FilePath \"wscript.exe\" -ArgumentList $vbsPath; " ^
+  "$shortcutPath = Join-Path $startupFolder \"TerminalAgent.lnk\"; " ^
+  "try { $wsh = New-Object -ComObject WScript.Shell; $sc = $wsh.CreateShortcut($shortcutPath); $sc.TargetPath = $destExe; $sc.Arguments = 'run'; $sc.WindowStyle = 7; $sc.Save() } catch {}; " ^
+  "Start-Process -FilePath $destExe -ArgumentList 'run' -WindowStyle Hidden; " ^
   "Write-Host ''; " ^
   "Write-Host '==========================================================' -ForegroundColor Green; " ^
   "Write-Host '  SUCCESS! Laptop paired and running permanently.' -ForegroundColor Green; " ^
