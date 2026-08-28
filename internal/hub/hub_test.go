@@ -160,6 +160,7 @@ func TestLiveCommandDispatchAndResult(t *testing.T) {
 		Token: "secret-token",
 	})
 	_ = readEnv(t, ctrlConn) // AUTH_ACK
+	_ = readEnv(t, ctrlConn) // DEVICE_LIST
 
 	// Controller enqueues command
 	sendEnv(t, ctrlConn, protocol.TypeEnqueueCmd, "agent-live", protocol.CommandPayload{
@@ -224,6 +225,7 @@ func TestOfflineQueuingAndFlushOnReconnect(t *testing.T) {
 		Token: "secret-token",
 	})
 	_ = readEnv(t, ctrlConn) // AUTH_ACK
+	_ = readEnv(t, ctrlConn) // DEVICE_LIST
 
 	// Enqueue 2 physical commands for offline agent
 	sendEnv(t, ctrlConn, protocol.TypeEnqueueCmd, "agent-offline", protocol.CommandPayload{
@@ -305,6 +307,7 @@ func TestPredefinedOfflineCommands(t *testing.T) {
 		Token: "secret-token",
 	})
 	_ = readEnv(t, ctrlConn) // AUTH_ACK
+	_ = readEnv(t, ctrlConn) // DEVICE_LIST
 
 	// 1. Send predefined command "status" when agent is offline
 	sendEnv(t, ctrlConn, protocol.TypeEnqueueCmd, "win-offline-pc", protocol.CommandPayload{

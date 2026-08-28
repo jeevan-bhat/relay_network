@@ -282,6 +282,10 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 	})
 	c.Send(ack)
 
+	if p.Role == protocol.RoleController {
+		h.handleGetDevices(c)
+	}
+
 	if p.Role == protocol.RoleAgent {
 		// Flush any pending cloud commands
 		h.flushPendingCommands(p.DeviceID)
@@ -447,12 +451,37 @@ func (h *Hub) handleSyncReq(c *Client, env protocol.Envelope) {
 	h.log.Info("sync completed for agent", "deviceId", req.DeviceID, "syncedResults", len(acked), "flushedCommands", len(pending))
 }
 
-func (h *Hub) handleGetDevices(c *Client) {
-	devices, err := h.store.ListDevices()
-	if err != nil {
-		h.sendError(c, "STORE_ERROR", err.Error())
-		return
+func (h *Hub) GetDevices() []protocol.DeviceInfo {
+	devices, _ := h.store.ListDevices()
+	if devices == nil {
+		devices = []protocol.DeviceInfo{}
 	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	devMap := make(map[string]bool)
+	for i := range devices {
+		devMap[devices[i].DeviceID] = true
+		if _, ok := h.agents[devices[i].DeviceID]; ok {
+			devices[i].Status = protocol.StatusOnline
+		}
+	}
+	for devID := range h.agents {
+		if !devMap[devID] {
+			devices = append(devices, protocol.DeviceInfo{
+				DeviceID:      devID,
+				Status:        protocol.StatusOnline,
+				LastHeartbeat: time.Now().Unix(),
+				ConnectedAt:   time.Now().Unix(),
+			})
+		}
+	}
+	return devices
+}
+
+func (h *Hub) handleGetDevices(c *Client) {
+	devices := h.GetDevices()
 	env, _ := protocol.NewEnvelope(protocol.TypeDeviceList, "", protocol.DeviceListPayload{
 		Devices: devices,
 	})

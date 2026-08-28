@@ -2,6 +2,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -54,11 +55,11 @@ func Default() Config {
 	var candidates []string
 	candidates = append(candidates, filepath.Join(cfg.DataDir(), "config.json"))
 
-	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
-		candidates = append(candidates, filepath.Join(localApp, "TerminalAgent", "config.json"))
-	}
 	if progData := os.Getenv("ProgramData"); progData != "" {
 		candidates = append(candidates, filepath.Join(progData, "TerminalAgent", "config.json"))
+	}
+	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
+		candidates = append(candidates, filepath.Join(localApp, "TerminalAgent", "config.json"))
 	}
 	if exe, err := os.Executable(); err == nil {
 		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "config.json"))
@@ -78,15 +79,18 @@ func Default() Config {
 		if err != nil {
 			continue
 		}
+		// Strip UTF-8 BOM if saved by Windows PowerShell
+		data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
+
 		var jc jsonConfig
 		if err := json.Unmarshal(data, &jc); err == nil {
-			if jc.RelayURL != "" && cfg.RelayURL == "" {
+			if jc.RelayURL != "" {
 				cfg.RelayURL = jc.RelayURL
 			}
-			if jc.DeviceID != "" && cfg.DeviceID == hostname {
+			if jc.DeviceID != "" {
 				cfg.DeviceID = jc.DeviceID
 			}
-			if jc.AuthToken != "" && cfg.AuthToken == "" {
+			if jc.AuthToken != "" {
 				cfg.AuthToken = jc.AuthToken
 			}
 			if jc.DBPath != "" {

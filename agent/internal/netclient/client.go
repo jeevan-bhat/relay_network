@@ -152,6 +152,14 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	go c.writePump(connCtx, conn)
 	go c.heartbeatLoop(connCtx)
 
+	// Send immediate initial heartbeat
+	metrics := health.Collect()
+	initialHb, _ := protocol.NewEnvelope(protocol.TypeHeartbeat, c.cfg.DeviceID, protocol.HeartbeatPayload{
+		DeviceID: c.cfg.DeviceID,
+		Metrics:  metrics,
+	})
+	c.Send(initialHb)
+
 	// 2. Perform Startup Offline Queue Synchronization
 	c.performSync()
 
