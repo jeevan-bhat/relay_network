@@ -280,10 +280,12 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 			devInfo.Metrics.MACAddress = devInfo.MACAddress
 		}
 		if authenticatedUser != nil {
+			c.userID = authenticatedUser.UserID
 			devInfo.UserID = authenticatedUser.UserID
 			_ = h.store.BindDeviceToUser(p.DeviceID, authenticatedUser.UserID)
 		} else {
 			if existing, _ := h.store.GetDevice(p.DeviceID); existing != nil && existing.UserID != "" {
+				c.userID = existing.UserID
 				devInfo.UserID = existing.UserID
 			}
 		}
@@ -328,11 +330,19 @@ func (h *Hub) handleHeartbeat(c *Client, env protocol.Envelope) {
 	})
 	c.Send(ack)
 
-	// Broadcast updated metrics & status to all controllers unconditionally
+	// Broadcast updated metrics & status ONLY to controllers of the owning user
+	devUserID := c.userID
+	if devUserID == "" {
+		if dev, _ := h.store.GetDevice(p.DeviceID); dev != nil {
+			devUserID = dev.UserID
+		}
+	}
 	hbEnv, _ := protocol.NewEnvelope(protocol.TypeHeartbeat, p.DeviceID, p)
 	h.mu.RLock()
 	for ctrl := range h.controllers {
-		ctrl.Send(hbEnv)
+		if ctrl.userID == "" || devUserID == "" || ctrl.userID == devUserID {
+			ctrl.Send(hbEnv)
+		}
 	}
 	h.mu.RUnlock()
 }
@@ -342,6 +352,15 @@ func (h *Hub) handleEnqueueCmd(c *Client, env protocol.Envelope) {
 	if err := env.DecodePayload(&p); err != nil {
 		h.sendError(c, "INVALID_PAYLOAD", err.Error())
 		return
+	}
+
+	// Verify device ownership if controller is authenticated to a specific user
+	if c.userID != "" {
+		dev, _ := h.store.GetDevice(p.DeviceID)
+		if dev != nil && dev.UserID != "" && dev.UserID != c.userID {
+			h.sendError(c, "UNAUTHORIZED", "device does not belong to your account")
+			return
+		}
 	}
 
 	if p.CommandID == "" {
@@ -364,7 +383,7 @@ func (h *Hub) handleEnqueueCmd(c *Client, env protocol.Envelope) {
 		agent.Send(dispatchEnv)
 		_ = h.store.MarkCommandDispatched(p.CommandID)
 		h.log.Info("command dispatched to live agent", "commandId", p.CommandID, "deviceId", agent.deviceID)
-		h.broadcastToControllers(env)
+		h.broadcastDeviceResult(p.DeviceID, env)
 		return
 	}
 
@@ -384,7 +403,7 @@ func (h *Hub) handleEnqueueCmd(c *Client, env protocol.Envelope) {
 		})
 		h.log.Info("predefined command executed in cloud for offline agent", "command", p.Command, "deviceId", p.DeviceID)
 		resEnv, _ := protocol.NewEnvelope(protocol.TypeCmdResult, p.DeviceID, res)
-		h.broadcastToControllers(resEnv)
+		h.broadcastDeviceResult(p.DeviceID, resEnv)
 		return
 	}
 
@@ -403,7 +422,7 @@ func (h *Hub) handleEnqueueCmd(c *Client, env protocol.Envelope) {
 	})
 	h.log.Info("custom script executed in cloud sandbox for offline agent", "command", p.Command, "deviceId", p.DeviceID, "exitCode", res.ExitCode)
 	resEnv, _ := protocol.NewEnvelope(protocol.TypeCmdResult, p.DeviceID, res)
-	h.broadcastToControllers(resEnv)
+	h.broadcastDeviceResult(p.DeviceID, resEnv)
 }
 
 func (h *Hub) handleCmdResult(c *Client, env protocol.Envelope) {
@@ -483,8 +502,7 @@ func (h *Hub) GetDevicesForUser(userID string) []protocol.DeviceInfo {
 	var devices []protocol.DeviceInfo
 	if userID != "" {
 		devices, _ = h.store.ListDevicesForUser(userID)
-	}
-	if len(devices) == 0 {
+	} else {
 		devices, _ = h.store.ListDevices()
 	}
 	if devices == nil {
@@ -494,22 +512,9 @@ func (h *Hub) GetDevicesForUser(userID string) []protocol.DeviceInfo {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	devMap := make(map[string]bool)
 	for i := range devices {
-		devMap[devices[i].DeviceID] = true
 		if _, ok := h.agents[devices[i].DeviceID]; ok {
 			devices[i].Status = protocol.StatusOnline
-		}
-	}
-	for devID, agentClient := range h.agents {
-		if !devMap[devID] {
-			devices = append(devices, protocol.DeviceInfo{
-				DeviceID:      devID,
-				UserID:        agentClient.userID,
-				Status:        protocol.StatusOnline,
-				LastHeartbeat: time.Now().Unix(),
-				ConnectedAt:   time.Now().Unix(),
-			})
 		}
 	}
 	return devices
@@ -534,14 +539,6 @@ func (h *Hub) getAgentClient(deviceID string) (*Client, bool) {
 	for id, a := range h.agents {
 		if strings.ToLower(id) == lower && a != nil {
 			return a, true
-		}
-	}
-	// Single-agent routing fallback: if only 1 physical agent is connected, match it
-	if len(h.agents) == 1 {
-		for _, a := range h.agents {
-			if a != nil {
-				return a, true
-			}
 		}
 	}
 	return nil, false
@@ -571,8 +568,33 @@ func (h *Hub) broadcastDeviceStatusLocked(deviceID, status string) {
 		"deviceId": deviceID,
 		"status":   status,
 	})
+	devUserID := ""
+	if agentClient := h.agents[deviceID]; agentClient != nil {
+		devUserID = agentClient.userID
+	}
+	if devUserID == "" {
+		if dev, _ := h.store.GetDevice(deviceID); dev != nil {
+			devUserID = dev.UserID
+		}
+	}
 	for c := range h.controllers {
-		c.Send(env)
+		if c.userID == "" || devUserID == "" || c.userID == devUserID {
+			c.Send(env)
+		}
+	}
+}
+
+func (h *Hub) broadcastDeviceResult(deviceID string, env protocol.Envelope) {
+	devUserID := ""
+	if dev, _ := h.store.GetDevice(deviceID); dev != nil {
+		devUserID = dev.UserID
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for ctrl := range h.controllers {
+		if ctrl.userID == "" || devUserID == "" || ctrl.userID == devUserID {
+			ctrl.Send(env)
+		}
 	}
 }
 
@@ -702,11 +724,19 @@ func (h *Hub) EnqueueDirect(cmd protocol.CommandPayload) error {
 		Details:     "Custom script executed in Cloud Sandbox (Laptop Asleep)",
 	})
 	resEnv, _ := protocol.NewEnvelope(protocol.TypeCmdResult, cmd.DeviceID, res)
-	h.broadcastToControllers(resEnv)
+	h.broadcastDeviceResult(cmd.DeviceID, resEnv)
 	return nil
 }
 
 func (h *Hub) routeToAgent(c *Client, env protocol.Envelope) {
+	if c.userID != "" {
+		dev, _ := h.store.GetDevice(env.DeviceID)
+		if dev != nil && dev.UserID != "" && dev.UserID != c.userID {
+			h.sendError(c, "UNAUTHORIZED", "device does not belong to your account")
+			return
+		}
+	}
+
 	agent, ok := h.getAgentClient(env.DeviceID)
 	if !ok || agent == nil {
 		h.sendError(c, "AGENT_OFFLINE", fmt.Sprintf("device %s is offline", env.DeviceID))
@@ -757,7 +787,7 @@ func (h *Hub) routeToControllers(c *Client, env protocol.Envelope) {
 		})
 	}
 
-	h.broadcastToControllers(env)
+	h.broadcastDeviceResult(env.DeviceID, env)
 }
 
 func (h *Hub) handleGetAuditLogs(c *Client, env protocol.Envelope) {

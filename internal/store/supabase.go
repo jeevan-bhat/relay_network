@@ -341,7 +341,10 @@ func (s *SupabaseStore) ListDevices() ([]protocol.DeviceInfo, error) {
 }
 
 func (s *SupabaseStore) ListDevicesForUser(userID string) ([]protocol.DeviceInfo, error) {
-	endpoint := fmt.Sprintf("/devices?or=(user_id.eq.%s,user_id.eq.)&order=last_heartbeat.desc", url.QueryEscape(userID))
+	if userID == "" {
+		return s.ListDevices()
+	}
+	endpoint := fmt.Sprintf("/devices?user_id=eq.%s&order=last_heartbeat.desc", url.QueryEscape(userID))
 	resBytes, code, err := s.req("GET", endpoint, nil, nil)
 	if err != nil || code >= 300 {
 		return nil, err

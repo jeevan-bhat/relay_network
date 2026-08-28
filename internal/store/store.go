@@ -392,17 +392,20 @@ func (s *Store) GetUserByUsername(username string) (*protocol.UserAccount, error
 	return &u, nil
 }
 
-// ListDevicesForUser returns devices belonging to the specified user (or unclaimed if user has no devices yet).
+// ListDevicesForUser returns devices belonging strictly to the specified user.
 func (s *Store) ListDevicesForUser(userID string) ([]protocol.DeviceInfo, error) {
 	if s.supabase != nil {
 		return s.supabase.ListDevicesForUser(userID)
 	}
+	if userID == "" {
+		return s.ListDevices()
+	}
 	rows, err := s.db.Query(`
 		SELECT DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
 		  FROM Devices
-		 WHERE UserId = ? OR (UserId = '' AND ? != '')
+		 WHERE UserId = ?
 		 ORDER BY LastHeartbeat DESC
-	`, userID, userID)
+	`, userID)
 	if err != nil {
 		return nil, err
 	}
