@@ -403,33 +403,35 @@ $destExe = Join-Path $agentDir "terminal-agent.exe"
 Stop-Process -Name "terminal-agent" -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
 
-$isValid = $false
-if (Test-Path $destExe) {
-    try {
-        if ((Get-Item $destExe).Length -gt 100000) { $isValid = $true }
-    } catch {}
-}
+$item = Get-Item -Path $destExe -ErrorAction SilentlyContinue
+$isValid = ($item -ne $null -and $item.Length -gt 100000)
 
 if (-not $isValid) {
-    if (Test-Path "terminal-agent.exe" -and (Get-Item "terminal-agent.exe").Length -gt 100000) {
-        Copy-Item "terminal-agent.exe" $destExe -Force
-        $isValid = $true
-    } elseif (Test-Path "..\agent\terminal-agent.exe" -and (Get-Item "..\agent\terminal-agent.exe").Length -gt 100000) {
-        Copy-Item "..\agent\terminal-agent.exe" $destExe -Force
+    $localExe = Get-Item -Path "terminal-agent.exe" -ErrorAction SilentlyContinue
+    if ($localExe -ne $null -and $localExe.Length -gt 100000) {
+        Copy-Item -Path $localExe.FullName -Destination $destExe -Force
         $isValid = $true
     } else {
-        Write-Host "Downloading agent binary from cloud..." -ForegroundColor Yellow
-        try {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            Invoke-WebRequest -Uri "%s" -OutFile $destExe -UseBasicParsing
-            if ((Get-Item $destExe).Length -gt 100000) { $isValid = $true }
-        } catch {}
-        
-        if (-not $isValid) {
+        $parentExe = Get-Item -Path "..\agent\terminal-agent.exe" -ErrorAction SilentlyContinue
+        if ($parentExe -ne $null -and $parentExe.Length -gt 100000) {
+            Copy-Item -Path $parentExe.FullName -Destination $destExe -Force
+            $isValid = $true
+        } else {
+            Write-Host "Downloading agent binary from cloud..." -ForegroundColor Yellow
             try {
-                Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe" -OutFile $destExe -UseBasicParsing
-                if ((Get-Item $destExe).Length -gt 100000) { $isValid = $true }
+                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                Invoke-WebRequest -Uri "%s" -OutFile $destExe -UseBasicParsing
+                $downItem = Get-Item -Path $destExe -ErrorAction SilentlyContinue
+                if ($downItem -ne $null -and $downItem.Length -gt 100000) { $isValid = $true }
             } catch {}
+            
+            if (-not $isValid) {
+                try {
+                    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe" -OutFile $destExe -UseBasicParsing
+                    $downItem = Get-Item -Path $destExe -ErrorAction SilentlyContinue
+                    if ($downItem -ne $null -and $downItem.Length -gt 100000) { $isValid = $true }
+                } catch {}
+            }
         }
     }
 }
