@@ -99,12 +99,13 @@ func (e Envelope) DecodePayload(target any) error {
 
 // AuthPayload is sent immediately after WebSocket connection opens.
 type AuthPayload struct {
-	Role     string `json:"role"`               // "agent" or "controller"
-	DeviceID string `json:"deviceId"`           // Unique device identifier
-	Token    string `json:"token,omitempty"`    // Shared secret or token
-	Hostname string `json:"hostname,omitempty"` // Host machine name
-	OS       string `json:"os,omitempty"`       // Operating system name
-	Version  string `json:"version,omitempty"`  // Client software version
+	Role       string `json:"role"`                 // "agent" or "controller"
+	DeviceID   string `json:"deviceId"`             // Unique device identifier
+	Token      string `json:"token,omitempty"`      // Shared secret or token
+	Hostname   string `json:"hostname,omitempty"`   // Host machine name
+	OS         string `json:"os,omitempty"`         // Operating system name
+	Version    string `json:"version,omitempty"`    // Client software version
+	MACAddress string `json:"macAddress,omitempty"` // Primary physical network MAC
 }
 
 // AuthAckPayload is the relay response to an AuthPayload.
@@ -127,6 +128,7 @@ type HealthMetrics struct {
 	UptimeSec       int64   `json:"uptimeSec"`
 	ProcessCount    int     `json:"processCount"`
 	PendingCmdCount int     `json:"pendingCmdCount"`
+	MACAddress      string  `json:"macAddress,omitempty"`
 }
 
 // HeartbeatPayload is sent periodically by the agent.
@@ -191,6 +193,7 @@ type DeviceInfo struct {
 	Status        string        `json:"status"` // ONLINE, DEGRADED, OFFLINE
 	LastHeartbeat int64         `json:"lastHeartbeat"`
 	ConnectedAt   int64         `json:"connectedAt"`
+	MACAddress    string        `json:"macAddress,omitempty"`
 	Metrics       HealthMetrics `json:"metrics"`
 }
 

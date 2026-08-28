@@ -119,12 +119,13 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	// 1. Perform Authentication Handshake
 	hostname, _ := os.Hostname()
 	authEnv, _ := protocol.NewEnvelope(protocol.TypeAuth, c.cfg.DeviceID, protocol.AuthPayload{
-		Role:     protocol.RoleAgent,
-		DeviceID: c.cfg.DeviceID,
-		Token:    c.cfg.AuthToken,
-		Hostname: hostname,
-		OS:       runtime.GOOS + "/" + runtime.GOARCH,
-		Version:  "1.0.0",
+		Role:       protocol.RoleAgent,
+		DeviceID:   c.cfg.DeviceID,
+		Token:      c.cfg.AuthToken,
+		Hostname:   hostname,
+		OS:         runtime.GOOS + "/" + runtime.GOARCH,
+		Version:    "1.0.0",
+		MACAddress: health.GetPrimaryMACAddress(),
 	})
 	if err := conn.WriteJSON(authEnv); err != nil {
 		return fmt.Errorf("send auth: %w", err)

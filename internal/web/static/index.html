@@ -50,7 +50,7 @@
 
     <!-- User Profile, Device Picker & Relay Badge -->
     <div class="flex items-center space-x-2 text-xs font-mono">
-      <select id="deviceSelector" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 max-w-[130px] sm:max-w-none truncate">
+      <select id="deviceSelector" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 max-w-[140px] sm:max-w-none truncate">
         <option value="">(No Devices)</option>
       </select>
 
@@ -89,7 +89,7 @@
   <!-- Main Viewports -->
   <main class="flex-1 max-w-[1400px] w-full mx-auto p-3 sm:p-5 flex flex-col space-y-4">
 
-    <!-- Account Token Pairing Banner (If no devices or to add device) -->
+    <!-- Account Token Pairing Banner -->
     <div id="pairBanner" class="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-800/40 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
       <div class="flex items-center space-x-3">
         <div class="w-8 h-8 rounded-lg bg-emerald-900/60 border border-emerald-700/50 flex items-center justify-center text-emerald-400 font-bold text-sm">
@@ -151,7 +151,7 @@
           </button>
           <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="ipconfig">
             <span class="font-bold text-emerald-400">ipconfig</span>
-            <span class="text-[10px] text-slate-400">Network &amp; WebSocket</span>
+            <span class="text-[10px] text-slate-400">Network, IP &amp; MAC</span>
           </button>
           <button class="predef-btn p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-left border border-slate-700/60 flex flex-col justify-between" data-cmd="uptime">
             <span class="font-bold text-emerald-400">uptime</span>
@@ -194,13 +194,13 @@
 
         <div id="terminalOutput" class="flex-1 overflow-y-auto font-mono text-xs text-slate-200 space-y-1.5 terminal-scroll pr-1 pb-2">
           <div class="text-slate-400">Terminal App v4.0 Mobile Controller ready.</div>
-          <div class="text-slate-400">Commands execute live when online, or queue automatically in cloud when offline.</div>
+          <div class="text-slate-400">Custom &amp; Predefined commands execute live when online, or queue automatically in cloud when offline.</div>
         </div>
 
         <form id="commandForm" class="mt-2 flex gap-2">
           <div class="relative flex-1">
             <span class="absolute left-3 top-2.5 font-mono text-xs text-emerald-400 font-bold">PS &gt;</span>
-            <input type="text" id="cmdInput" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-12 pr-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Type PowerShell command (e.g. dir, Get-Service, ipconfig)..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="cmdInput" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-12 pr-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500" placeholder="Type any PowerShell command (e.g. dir, Get-Process, ipconfig)..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           </div>
           <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-black font-mono font-bold text-xs rounded-lg transition shadow-md shadow-brand-500/20">
             Execute
@@ -245,12 +245,12 @@
     </div>
 
     <!-- ============================================================== -->
-    <!-- TAB 3: HEALTH, TELEMETRY & PROCESSES                           -->
+    <!-- TAB 3: HEALTH, TELEMETRY, MAC & PROCESSES                      -->
     <!-- ============================================================== -->
     <div id="tab-health" class="tab-content hidden flex-1 flex flex-col space-y-4">
       
       <!-- Telemetry Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg">
           <div class="flex items-center justify-between text-xs text-slate-400 font-mono mb-1">
             <span>CPU Usage</span>
@@ -275,6 +275,11 @@
         <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg flex flex-col justify-between">
           <div class="text-xs text-slate-400 font-mono">System Uptime</div>
           <div id="uptimeText" class="text-lg font-bold font-mono text-amber-400 mt-1">--</div>
+        </div>
+
+        <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg flex flex-col justify-between">
+          <div class="text-xs text-slate-400 font-mono">Physical MAC Address</div>
+          <div id="macTextDisplay" class="text-xs font-bold font-mono text-emerald-400 mt-1 truncate">--</div>
         </div>
       </div>
 
@@ -305,11 +310,16 @@
         </div>
       </div>
 
-      <!-- Wake-on-LAN Controller -->
-      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3 shadow-lg">
-        <h3 class="text-xs font-bold text-slate-300 mb-2 flex items-center gap-1.5 font-mono">
-          <span class="text-amber-400">⚡</span> Remote Wake-on-LAN (WoL) Trigger
-        </h3>
+      <!-- Wake-on-LAN Controller with Auto-Detected Laptop MAC -->
+      <div class="bg-dark-900 border border-slate-800 rounded-xl p-3.5 shadow-lg space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5 font-mono">
+            <span class="text-amber-400">⚡</span> Remote Wake-on-LAN (WoL) Magic Packet
+          </h3>
+          <div class="text-[11px] font-mono text-slate-400">
+            Detected MAC: <span id="currentMacDisplay" class="text-emerald-400 font-bold font-mono">--</span>
+          </div>
+        </div>
         <div class="flex gap-2">
           <input type="text" id="wolMacInput" placeholder="Target MAC Address (e.g. 00:1A:2B:3C:4D:5E)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500" />
           <button id="sendWolBtn" class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs rounded-lg transition">Send Magic Packet</button>
@@ -441,15 +451,6 @@
         </div>
       </div>
 
-      <!-- Cloud Database Backend Status -->
-      <div id="storageStatusBadge" class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs font-mono">
-        <div class="flex items-center gap-2">
-          <span id="storageStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-          <span class="text-slate-300 font-bold">Cloud Database:</span>
-        </div>
-        <span id="storageStatusText" class="text-emerald-400 font-bold">Checking...</span>
-      </div>
-
       <!-- Pairing Guide Card -->
       <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-300 space-y-1.5 font-mono">
         <div class="font-bold text-amber-400 flex items-center gap-1">⚡ How to Pair a New Windows Laptop:</div>
@@ -552,24 +553,6 @@
     // ==============================================================
 
     async function initAuth() {
-      // Check Cloud Backend Status (Supabase or SQLite)
-      fetch('/api/system/status').then(r => r.json()).then(data => {
-        const isSb = data.is_supabase;
-        const statusText = document.getElementById('storageStatusText');
-        const statusDot = document.getElementById('storageStatusDot');
-        if (statusText && statusDot) {
-          if (isSb) {
-            statusText.textContent = '🟢 Supabase Cloud (24/7 Permanent)';
-            statusText.className = 'text-emerald-400 font-bold';
-            statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
-          } else {
-            statusText.textContent = '💾 SQLite Local File';
-            statusText.className = 'text-slate-400 font-mono';
-            statusDot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
-          }
-        }
-      }).catch(() => {});
-
       const stored = localStorage.getItem(AUTH_STORAGE_KEY);
       if (stored) {
         try {
@@ -678,6 +661,13 @@
       }
     }
 
+    function getDeviceMAC(d) {
+      if (!d) return '';
+      if (d.macAddress && d.macAddress.trim()) return d.macAddress.trim();
+      if (d.metrics && d.metrics.macAddress && d.metrics.macAddress.trim()) return d.metrics.macAddress.trim();
+      return '';
+    }
+
     function updateUserUI() {
       if (!currentUser) return;
       userProfileName.textContent = currentUser.username;
@@ -700,6 +690,7 @@
 
       listEl.innerHTML = devArray.map(d => {
         const isOnline = d.status === 'ONLINE';
+        const mac = getDeviceMAC(d) || 'Auto-detecting...';
         const badge = isOnline
           ? '<span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px]">ONLINE</span>'
           : '<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">OFFLINE</span>';
@@ -709,7 +700,9 @@
               <span class="text-base">${isOnline ? '🟢' : '🌙'}</span>
               <div>
                 <div class="font-bold text-slate-200">${escapeHtml(d.deviceId)}</div>
-                <div class="text-[10px] text-slate-400">${escapeHtml(d.hostname || 'Windows PC')} • ${escapeHtml(d.os || 'Windows')}</div>
+                <div class="text-[10px] text-slate-400">
+                  ${escapeHtml(d.hostname || 'Windows PC')} • <span class="text-emerald-400 font-mono">MAC: ${escapeHtml(mac)}</span>
+                </div>
               </div>
             </div>
             ${badge}
@@ -864,6 +857,9 @@
             const devId = env.payload.deviceId;
             if (devices[devId]) {
               devices[devId].metrics = env.payload.metrics;
+              if (env.payload.metrics && env.payload.metrics.macAddress) {
+                devices[devId].macAddress = env.payload.metrics.macAddress;
+              }
               devices[devId].status = 'ONLINE';
               devices[devId].lastHeartbeat = Math.floor(Date.now()/1000);
             }
@@ -912,7 +908,9 @@
       const prev = selectedDeviceId || devArray[0].deviceId;
       deviceSelector.innerHTML = devArray.map(d => {
         const icon = d.status === 'ONLINE' ? '🟢' : '🌙';
-        return `<option value="${d.deviceId}" ${d.deviceId === prev ? 'selected' : ''}>${icon} ${d.deviceId} (${d.status || 'OFFLINE'})</option>`;
+        const mac = getDeviceMAC(d);
+        const macTag = mac ? ` [MAC: ${mac}]` : '';
+        return `<option value="${d.deviceId}" ${d.deviceId === prev ? 'selected' : ''}>${icon} ${d.deviceId}${macTag} (${d.status || 'OFFLINE'})</option>`;
       }).join('');
 
       selectedDeviceId = deviceSelector.value;
@@ -933,12 +931,31 @@
       const d = devices[selectedDeviceId];
       const dot = document.getElementById('activeDevStatusDot');
       const title = document.getElementById('activeDevHeaderTitle');
+      const wolInput = document.getElementById('wolMacInput');
+      const currentMacDisplay = document.getElementById('currentMacDisplay');
+      const macTextDisplay = document.getElementById('macTextDisplay');
+
       if (!d) {
         dot.className = 'w-2 h-2 rounded-full bg-slate-600';
         title.textContent = 'No device paired';
+        if (macTextDisplay) macTextDisplay.textContent = '--';
+        if (currentMacDisplay) currentMacDisplay.textContent = '--';
         return;
       }
-      title.textContent = `${d.deviceId} • ${d.hostname || 'Windows Laptop'}`;
+
+      const mac = getDeviceMAC(d) || 'Auto-detecting...';
+      title.textContent = `${d.deviceId} • ${d.hostname || 'Windows PC'} • MAC: ${mac}`;
+      
+      if (wolInput && getDeviceMAC(d)) {
+        wolInput.value = getDeviceMAC(d);
+      }
+      if (currentMacDisplay) {
+        currentMacDisplay.textContent = mac;
+      }
+      if (macTextDisplay) {
+        macTextDisplay.textContent = mac;
+      }
+
       if (d.status === 'ONLINE') dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
       else if (d.status === 'DEGRADED') dot.className = 'w-2 h-2 rounded-full bg-amber-400';
       else dot.className = 'w-2 h-2 rounded-full bg-amber-500';
@@ -965,10 +982,14 @@
       const h = Math.floor(sec / 3600);
       const min = Math.floor((sec % 3600) / 60);
       document.getElementById('uptimeText').textContent = `${h}h ${min}m`;
+
+      const mac = getDeviceMAC(d) || (m.macAddress ? m.macAddress : '--');
+      const macDisplay = document.getElementById('macTextDisplay');
+      if (macDisplay) macDisplay.textContent = mac;
     }
 
     // ==============================================================
-    // TERMINAL COMMAND EXECUTION
+    // TERMINAL COMMAND EXECUTION (WORKS ONLINE & OFFLINE)
     // ==============================================================
 
     function appendConsole(text, colorClass = 'text-slate-200') {
@@ -1011,6 +1032,13 @@
       cmdHistory.push(cmd);
       historyIdx = cmdHistory.length;
       appendConsole(`PS [${selectedDeviceId}]> ${cmd}`, 'text-emerald-400 font-bold mt-1');
+
+      const d = devices[selectedDeviceId];
+      const isOffline = !d || d.status !== 'ONLINE';
+      if (isOffline) {
+        appendConsole(`⚡ [QUEUED IN CLOUD — LAPTOP OFFLINE] Command stored in cloud queue. It will automatically execute on ${selectedDeviceId} the moment it powers on.`, 'text-amber-400 text-[11px]');
+      }
+
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'ENQUEUE_CMD',
@@ -1270,7 +1298,7 @@
         const ts = new Date(l.timestamp * 1000).toLocaleString();
         let actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">ACTION</span>';
         if (l.actionType === 'EXEC_CMD') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800">EXEC_CMD</span>';
-        else if (l.actionType === 'CLOUD_EXEC') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-400 border border-indigo-800">CLOUD_EXEC</span>';
+        else if (l.actionType === 'CLOUD_EXEC' || l.actionType === 'CLOUD_SCRIPT_EXEC') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-400 border border-indigo-800">CLOUD_EXEC</span>';
         else if (l.actionType === 'FILE_WRITE') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800">FILE_WRITE</span>';
         else if (l.actionType === 'FILE_DELETE') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-400 border border-red-800">FILE_DELETE</span>';
         else if (l.actionType === 'PROCESS_KILL') actionBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-400 border border-amber-800">PROCESS_KILL</span>';

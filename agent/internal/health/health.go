@@ -3,6 +3,7 @@
 package health
 
 import (
+	"net"
 	"runtime"
 	"sync"
 	"syscall"
@@ -48,6 +49,27 @@ func (ft filetime) toUint64() uint64 {
 	return (uint64(ft.dwHighDateTime) << 32) | uint64(ft.dwLowDateTime)
 }
 
+// GetPrimaryMACAddress returns the physical MAC address of the active network adapter.
+func GetPrimaryMACAddress() string {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	// Prefer non-loopback up interfaces with 6-byte hardware address
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagLoopback == 0 && iface.Flags&net.FlagUp != 0 && len(iface.HardwareAddr) == 6 {
+			return iface.HardwareAddr.String()
+		}
+	}
+	// Fallback to any non-empty hardware address
+	for _, iface := range interfaces {
+		if len(iface.HardwareAddr) == 6 && iface.Flags&net.FlagLoopback == 0 {
+			return iface.HardwareAddr.String()
+		}
+	}
+	return ""
+}
+
 // Collect returns a snapshot of current system health metrics.
 func Collect() protocol.HealthMetrics {
 	var m protocol.HealthMetrics
@@ -70,6 +92,7 @@ func Collect() protocol.HealthMetrics {
 		m.UptimeSec = int64(time.Since(lastSampled).Seconds())
 	}
 
+	m.MACAddress = GetPrimaryMACAddress()
 	m.ProcessCount = runtime.NumGoroutine()
 	return m
 }

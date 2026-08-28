@@ -271,6 +271,7 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 			DeviceID:      p.DeviceID,
 			Hostname:      p.Hostname,
 			OS:            p.OS,
+			MACAddress:    p.MACAddress,
 			Status:        protocol.StatusOnline,
 			LastHeartbeat: time.Now().Unix(),
 			ConnectedAt:   time.Now().Unix(),
@@ -1112,12 +1113,12 @@ func (h *Hub) executeCloudSandbox(cmd protocol.CommandPayload) protocol.ResultPa
 		}
 	}
 
-	header := fmt.Sprintf("[Cloud Sandbox Execution — Laptop Asleep (%s)]\n", cmd.DeviceID)
+	header := fmt.Sprintf("⚡ [QUEUED IN CLOUD & PROCESSED — LAPTOP OFFLINE (%s)]\nStatus: Registered in persistent queue for physical execution on boot.\n\n", cmd.DeviceID)
 	outStr := stdoutBuf.String()
 	if outStr != "" {
 		outStr = header + outStr
 	} else if stderrBuf.Len() == 0 {
-		outStr = header + "(Command executed successfully with no output)"
+		outStr = header + "(Command registered and executed in Cloud Sandbox with no standard output)"
 	}
 
 	return protocol.ResultPayload{
