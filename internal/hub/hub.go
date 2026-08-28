@@ -282,6 +282,10 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 		if authenticatedUser != nil {
 			devInfo.UserID = authenticatedUser.UserID
 			_ = h.store.BindDeviceToUser(p.DeviceID, authenticatedUser.UserID)
+		} else {
+			if existing, _ := h.store.GetDevice(p.DeviceID); existing != nil && existing.UserID != "" {
+				devInfo.UserID = existing.UserID
+			}
 		}
 		_ = h.store.UpsertDevice(devInfo)
 		h.log.Info("agent authenticated", "deviceId", p.DeviceID, "host", p.Hostname, "userId", devInfo.UserID)
@@ -324,13 +328,11 @@ func (h *Hub) handleHeartbeat(c *Client, env protocol.Envelope) {
 	})
 	c.Send(ack)
 
-	// Broadcast updated metrics & status to matching controllers
+	// Broadcast updated metrics & status to all controllers unconditionally
 	hbEnv, _ := protocol.NewEnvelope(protocol.TypeHeartbeat, p.DeviceID, p)
 	h.mu.RLock()
 	for ctrl := range h.controllers {
-		if c.userID == "" || ctrl.userID == "" || ctrl.userID == c.userID {
-			ctrl.Send(hbEnv)
-		}
+		ctrl.Send(hbEnv)
 	}
 	h.mu.RUnlock()
 }
