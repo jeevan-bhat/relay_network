@@ -330,16 +330,13 @@ func (h *Hub) handleEnqueueCmd(c *Client, env protocol.Envelope) {
 		return
 	}
 
-	h.mu.RLock()
-	agent, online := h.agents[p.DeviceID]
-	h.mu.RUnlock()
-
+	agent, online := h.getAgentClient(p.DeviceID)
 	if online && agent != nil {
-		// Dispatch immediately
-		dispatchEnv, _ := protocol.NewEnvelope(protocol.TypeDispatchCmd, p.DeviceID, p)
+		// Dispatch immediately to physical agent
+		dispatchEnv, _ := protocol.NewEnvelope(protocol.TypeDispatchCmd, agent.deviceID, p)
 		agent.Send(dispatchEnv)
 		_ = h.store.MarkCommandDispatched(p.CommandID)
-		h.log.Info("command dispatched to agent", "commandId", p.CommandID, "deviceId", p.DeviceID)
+		h.log.Info("command dispatched to live agent", "commandId", p.CommandID, "deviceId", agent.deviceID)
 		h.broadcastToControllers(env)
 		return
 	}
@@ -488,25 +485,46 @@ func (h *Hub) handleGetDevices(c *Client) {
 	c.Send(env)
 }
 
+func (h *Hub) getAgentClient(deviceID string) (*Client, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if a, ok := h.agents[deviceID]; ok && a != nil {
+		return a, true
+	}
+	lower := strings.ToLower(deviceID)
+	for id, a := range h.agents {
+		if strings.ToLower(id) == lower && a != nil {
+			return a, true
+		}
+	}
+	// Single-agent routing fallback: if only 1 physical agent is connected, match it
+	if len(h.agents) == 1 {
+		for _, a := range h.agents {
+			if a != nil {
+				return a, true
+			}
+		}
+	}
+	return nil, false
+}
+
 func (h *Hub) flushPendingCommands(deviceID string) {
 	pending, err := h.store.GetPendingCommands(deviceID)
 	if err != nil || len(pending) == 0 {
 		return
 	}
 
-	h.mu.RLock()
-	agent, ok := h.agents[deviceID]
-	h.mu.RUnlock()
-
+	agent, ok := h.getAgentClient(deviceID)
 	if !ok || agent == nil {
 		return
 	}
 
 	for _, cmd := range pending {
-		dispatchEnv, _ := protocol.NewEnvelope(protocol.TypeDispatchCmd, deviceID, cmd)
+		dispatchEnv, _ := protocol.NewEnvelope(protocol.TypeDispatchCmd, agent.deviceID, cmd)
 		agent.Send(dispatchEnv)
 		_ = h.store.MarkCommandDispatched(cmd.CommandID)
-		h.log.Info("flushed pending command to agent", "commandId", cmd.CommandID, "deviceId", deviceID)
+		h.log.Info("flushed pending command to agent", "commandId", cmd.CommandID, "deviceId", agent.deviceID)
 	}
 }
 
@@ -645,15 +663,7 @@ func (h *Hub) EnqueueDirect(cmd protocol.CommandPayload) error {
 }
 
 func (h *Hub) routeToAgent(c *Client, env protocol.Envelope) {
-	if env.DeviceID == "" {
-		h.sendError(c, "MISSING_DEVICE_ID", "deviceId is required")
-		return
-	}
-
-	h.mu.RLock()
-	agent, ok := h.agents[env.DeviceID]
-	h.mu.RUnlock()
-
+	agent, ok := h.getAgentClient(env.DeviceID)
 	if !ok || agent == nil {
 		h.sendError(c, "AGENT_OFFLINE", fmt.Sprintf("device %s is offline", env.DeviceID))
 		return
