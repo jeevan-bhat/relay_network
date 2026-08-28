@@ -89,10 +89,7 @@ try {
 # 4. Create Invisible Startup Launcher in Windows Startup Folder
 $startupFolder = [Environment]::GetFolderPath("Startup")
 $vbsPath = Join-Path $startupFolder "TerminalAgent.vbs"
-$vbsContent = @"
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """$destExe"" run", 0, False
-"@
+$vbsContent = "Set WshShell = CreateObject(`"WScript.Shell`")`r`nWshShell.Run `"`"`"$destExe`"`" run`", 0, False"
 Set-Content -Path $vbsPath -Value $vbsContent -Force
 Write-Host "[✓] Registered in Windows Startup: $vbsPath" -ForegroundColor Green
 
@@ -118,5 +115,4 @@ if ($proc) {
 }
 
 Write-Host ""
-Write-Host "Press any key to exit..." -ForegroundColor Gray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "Setup complete." -ForegroundColor Gray

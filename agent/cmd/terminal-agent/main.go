@@ -17,6 +17,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -101,14 +102,26 @@ func cmdRun(args []string) {
 	_ = fs.Parse(args)
 
 	cfg := def
-	cfg.DBPath = *dbPath
-	cfg.RelayURL = *relayURL
-	cfg.DeviceID = *deviceID
-	cfg.AuthToken = *token
-	cfg.Timeout = *timeout
-	cfg.PollInterval = *poll
+	if *dbPath != "" {
+		cfg.DBPath = *dbPath
+	}
+	if *relayURL != "" {
+		cfg.RelayURL = *relayURL
+	}
+	if *deviceID != "" {
+		cfg.DeviceID = *deviceID
+	}
+	if *token != "" {
+		cfg.AuthToken = *token
+	}
+	if *timeout > 0 {
+		cfg.Timeout = *timeout
+	}
+	if *poll > 0 {
+		cfg.PollInterval = *poll
+	}
 
-	log := stderrLogger()
+	log := serviceLogger(cfg)
 	st := openStore(cfg.DBPath)
 	defer st.Close()
 
@@ -249,19 +262,19 @@ func runService() {
 	}
 }
 
-// serviceLogger logs to stderr when interactive, otherwise to a file next to the
-// queue database (a Windows service has no console).
+// serviceLogger logs to both file and stderr when interactive, or file only when running as background service.
 func serviceLogger(cfg config.Config) *slog.Logger {
-	if service.Interactive() {
-		return stderrLogger()
-	}
 	_ = os.MkdirAll(cfg.DataDir(), 0o755)
-	f, err := os.OpenFile(filepath.Join(cfg.DataDir(), "agent.log"),
-		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logPath := filepath.Join(cfg.DataDir(), "agent.log")
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return stderrLogger()
 	}
-	return slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	var w io.Writer = f
+	if service.Interactive() {
+		w = io.MultiWriter(os.Stderr, f)
+	}
+	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelInfo}))
 }
 
 func indent(s string) string {

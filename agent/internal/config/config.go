@@ -50,25 +50,43 @@ func Default() Config {
 		HeartbeatInterval: 15 * time.Second,
 	}
 
-	// Read config.json if present in data directory
-	cfgPath := filepath.Join(cfg.DataDir(), "config.json")
-	if data, err := os.ReadFile(cfgPath); err == nil {
-		type jsonConfig struct {
-			RelayURL          string `json:"relay_url"`
-			DeviceID          string `json:"device_id"`
-			AuthToken         string `json:"auth_token"`
-			DBPath            string `json:"db_path"`
-			HeartbeatInterval string `json:"heartbeat_interval"`
+	// Look for config.json in candidate locations
+	var candidates []string
+	candidates = append(candidates, filepath.Join(cfg.DataDir(), "config.json"))
+
+	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
+		candidates = append(candidates, filepath.Join(localApp, "TerminalAgent", "config.json"))
+	}
+	if progData := os.Getenv("ProgramData"); progData != "" {
+		candidates = append(candidates, filepath.Join(progData, "TerminalAgent", "config.json"))
+	}
+	if exe, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "config.json"))
+	}
+	candidates = append(candidates, "config.json")
+
+	type jsonConfig struct {
+		RelayURL          string `json:"relay_url"`
+		DeviceID          string `json:"device_id"`
+		AuthToken         string `json:"auth_token"`
+		DBPath            string `json:"db_path"`
+		HeartbeatInterval string `json:"heartbeat_interval"`
+	}
+
+	for _, p := range candidates {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
 		}
 		var jc jsonConfig
 		if err := json.Unmarshal(data, &jc); err == nil {
-			if jc.RelayURL != "" {
+			if jc.RelayURL != "" && cfg.RelayURL == "" {
 				cfg.RelayURL = jc.RelayURL
 			}
-			if jc.DeviceID != "" {
+			if jc.DeviceID != "" && cfg.DeviceID == hostname {
 				cfg.DeviceID = jc.DeviceID
 			}
-			if jc.AuthToken != "" {
+			if jc.AuthToken != "" && cfg.AuthToken == "" {
 				cfg.AuthToken = jc.AuthToken
 			}
 			if jc.DBPath != "" {
@@ -79,11 +97,18 @@ func Default() Config {
 					cfg.HeartbeatInterval = d
 				}
 			}
+			break
 		}
 	}
 
+	if envRelay := os.Getenv("TERMINAL_RELAY_URL"); envRelay != "" {
+		cfg.RelayURL = envRelay
+	}
 	if envDev := os.Getenv("TERMINAL_DEVICE_ID"); envDev != "" {
 		cfg.DeviceID = envDev
+	}
+	if envToken := os.Getenv("TERMINAL_AUTH_TOKEN"); envToken != "" {
+		cfg.AuthToken = envToken
 	}
 
 	return cfg
