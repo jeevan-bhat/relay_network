@@ -66,8 +66,7 @@ func (c *Client) Run(ctx context.Context) {
 		return
 	}
 
-	backoff := 1 * time.Second
-	maxBackoff := 30 * time.Second
+	backoff := 2 * time.Second
 
 	for {
 		if ctx.Err() != nil {
@@ -82,7 +81,8 @@ func (c *Client) Run(ctx context.Context) {
 
 		c.setConnected(false)
 
-		// Calculate exponential backoff with jitter
+		// Reset backoff so reconnection happens within 2-3 seconds
+		backoff = 2 * time.Second
 		jitter := time.Duration(rand.Intn(500)) * time.Millisecond
 		sleepDur := backoff + jitter
 		c.log.Info("retrying relay connection", "after", sleepDur)
@@ -91,11 +91,6 @@ func (c *Client) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-time.After(sleepDur):
-		}
-
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
 		}
 	}
 }
@@ -131,7 +126,7 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 		return fmt.Errorf("send auth: %w", err)
 	}
 
-	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 	var ackEnv protocol.Envelope
 	if err := conn.ReadJSON(&ackEnv); err != nil {
 		return fmt.Errorf("read auth ack: %w", err)
@@ -169,22 +164,36 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 }
 
 func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
+	conn.SetReadLimit(10 * 1024 * 1024)
+	_ = conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+		return nil
+	})
+
 	for {
-		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		var env protocol.Envelope
 		if err := conn.ReadJSON(&env); err != nil {
 			return err
 		}
-
+		_ = conn.SetReadDeadline(time.Now().Add(90 * time.Second))
 		c.handleIncoming(env)
 	}
 }
 
 func (c *Client) writePump(ctx context.Context, conn *websocket.Conn) {
+	pingTicker := time.NewTicker(20 * time.Second)
+	defer pingTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-pingTicker.C:
+			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
 		case env, ok := <-c.send:
 			if !ok {
 				return
