@@ -569,11 +569,8 @@ func (h *Hub) broadcastDeviceStatusLocked(deviceID, status string) {
 		"deviceId": deviceID,
 		"status":   status,
 	})
-	agentClient := h.agents[deviceID]
 	for c := range h.controllers {
-		if agentClient == nil || c.userID == "" || agentClient.userID == "" || c.userID == agentClient.userID {
-			c.Send(env)
-		}
+		c.Send(env)
 	}
 }
 
@@ -609,19 +606,25 @@ func (h *Hub) livenessTracker() {
 			}
 			now := time.Now().Unix()
 			for _, d := range devices {
-				if d.LastHeartbeat == 0 {
-					continue
-				}
-				elapsed := time.Duration(now-d.LastHeartbeat) * time.Second
+				h.mu.RLock()
+				_, isLiveConn := h.agents[d.DeviceID]
+				h.mu.RUnlock()
 
 				var newStatus string
-				switch {
-				case elapsed >= h.cfg.HeartbeatTimeout:
-					newStatus = protocol.StatusOffline
-				case elapsed >= h.cfg.HeartbeatDegraded:
-					newStatus = protocol.StatusDegraded
-				default:
+				if isLiveConn {
 					newStatus = protocol.StatusOnline
+				} else if d.LastHeartbeat == 0 {
+					newStatus = protocol.StatusOffline
+				} else {
+					elapsed := time.Duration(now-d.LastHeartbeat) * time.Second
+					switch {
+					case elapsed >= h.cfg.HeartbeatTimeout:
+						newStatus = protocol.StatusOffline
+					case elapsed >= h.cfg.HeartbeatDegraded:
+						newStatus = protocol.StatusDegraded
+					default:
+						newStatus = protocol.StatusOnline
+					}
 				}
 
 				if newStatus != d.Status {
@@ -629,7 +632,7 @@ func (h *Hub) livenessTracker() {
 					h.mu.RLock()
 					h.broadcastDeviceStatusLocked(d.DeviceID, newStatus)
 					h.mu.RUnlock()
-					h.log.Info("device liveness changed", "deviceId", d.DeviceID, "oldStatus", d.Status, "newStatus", newStatus, "elapsed", elapsed)
+					h.log.Info("device liveness changed", "deviceId", d.DeviceID, "oldStatus", d.Status, "newStatus", newStatus)
 				}
 			}
 		}

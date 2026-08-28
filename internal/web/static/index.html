@@ -1010,6 +1010,12 @@
           payload: { role: 'controller', token: tok }
         }));
         ws.send(JSON.stringify({ type: 'GET_DEVICES' }));
+        if (window.devicesPollInterval) clearInterval(window.devicesPollInterval);
+        window.devicesPollInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'GET_DEVICES' }));
+          }
+        }, 4000);
       };
 
       ws.onmessage = (event) => {

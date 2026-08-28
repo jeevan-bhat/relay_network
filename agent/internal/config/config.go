@@ -51,19 +51,18 @@ func Default() Config {
 		HeartbeatInterval: 15 * time.Second,
 	}
 
-	// Look for config.json in candidate locations
+	// Look for config.json in candidate locations (prioritize LOCALAPPDATA)
 	var candidates []string
-	candidates = append(candidates, filepath.Join(cfg.DataDir(), "config.json"))
-
-	if progData := os.Getenv("ProgramData"); progData != "" {
-		candidates = append(candidates, filepath.Join(progData, "TerminalAgent", "config.json"))
-	}
 	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
 		candidates = append(candidates, filepath.Join(localApp, "TerminalAgent", "config.json"))
+	}
+	if progData := os.Getenv("ProgramData"); progData != "" {
+		candidates = append(candidates, filepath.Join(progData, "TerminalAgent", "config.json"))
 	}
 	if exe, err := os.Executable(); err == nil {
 		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "config.json"))
 	}
+	candidates = append(candidates, filepath.Join(cfg.DataDir(), "config.json"))
 	candidates = append(candidates, "config.json")
 
 	type jsonConfig struct {
@@ -84,16 +83,16 @@ func Default() Config {
 
 		var jc jsonConfig
 		if err := json.Unmarshal(data, &jc); err == nil {
-			if jc.RelayURL != "" {
+			if jc.RelayURL != "" && (cfg.RelayURL == "" || cfg.RelayURL == "ws://localhost:8080/ws") {
 				cfg.RelayURL = jc.RelayURL
 			}
-			if jc.DeviceID != "" {
+			if jc.DeviceID != "" && (cfg.DeviceID == "" || cfg.DeviceID == hostname) {
 				cfg.DeviceID = jc.DeviceID
 			}
-			if jc.AuthToken != "" {
+			if jc.AuthToken != "" && cfg.AuthToken == "" {
 				cfg.AuthToken = jc.AuthToken
 			}
-			if jc.DBPath != "" {
+			if jc.DBPath != "" && cfg.DBPath == DefaultDBPath() {
 				cfg.DBPath = jc.DBPath
 			}
 			if jc.HeartbeatInterval != "" {
@@ -101,7 +100,6 @@ func Default() Config {
 					cfg.HeartbeatInterval = d
 				}
 			}
-			break
 		}
 	}
 
