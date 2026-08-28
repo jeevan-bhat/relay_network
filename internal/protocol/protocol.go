@@ -183,9 +183,33 @@ type SyncRespPayload struct {
 	PendingCommands []CommandPayload `json:"pendingCommands"`
 }
 
+// UserAccount represents a registered user account in the system.
+type UserAccount struct {
+	UserID    string `json:"userId"`
+	Username  string `json:"username"`
+	Password  string `json:"password,omitempty"` // Plaintext/viewable for credentials profile
+	AuthToken string `json:"authToken"`          // Unique pairing & auth token
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// UserAuthRequest carries user registration or login credentials.
+type UserAuthRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// UserAuthResponse carries the authenticated user and their paired devices.
+type UserAuthResponse struct {
+	Success bool         `json:"success"`
+	Error   string       `json:"error,omitempty"`
+	User    *UserAccount `json:"user,omitempty"`
+	Devices []DeviceInfo `json:"devices,omitempty"`
+}
+
 // DeviceInfo represents a registered device in the Relay.
 type DeviceInfo struct {
 	DeviceID      string        `json:"deviceId"`
+	UserID        string        `json:"userId,omitempty"`
 	Hostname      string        `json:"hostname"`
 	OS            string        `json:"os"`
 	Status        string        `json:"status"` // ONLINE, DEGRADED, OFFLINE

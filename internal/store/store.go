@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/google/uuid"
 	"terminalrelay/internal/protocol"
 
 	_ "modernc.org/sqlite" // Pure-Go SQLite driver
@@ -72,8 +73,18 @@ func (s *Store) Close() error {
 }
 
 const schema = `
+CREATE TABLE IF NOT EXISTS Users (
+    UserId       TEXT PRIMARY KEY,
+    Username     TEXT UNIQUE NOT NULL,
+    Password     TEXT NOT NULL,
+    AuthToken    TEXT UNIQUE NOT NULL,
+    CreatedAt    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_users_token ON Users(AuthToken);
+
 CREATE TABLE IF NOT EXISTS Devices (
     DeviceId      TEXT PRIMARY KEY,
+    UserId        TEXT NOT NULL DEFAULT '',
     Hostname      TEXT,
     OS            TEXT,
     Status        TEXT NOT NULL DEFAULT 'OFFLINE',
@@ -81,6 +92,7 @@ CREATE TABLE IF NOT EXISTS Devices (
     ConnectedAt   INTEGER NOT NULL DEFAULT 0,
     HealthJSON    TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_dev_user ON Devices(UserId);
 
 CREATE TABLE IF NOT EXISTS CloudCommandQueue (
     CommandId    TEXT PRIMARY KEY,
@@ -123,24 +135,28 @@ CREATE INDEX IF NOT EXISTS idx_audit_time ON AuditLogs(Timestamp DESC);
 `
 
 func (s *Store) migrate() error {
-	_, err := s.db.Exec(schema)
-	return err
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+	_, _ = s.db.Exec(`ALTER TABLE Devices ADD COLUMN UserId TEXT NOT NULL DEFAULT '';`)
+	return nil
 }
 
 // UpsertDevice inserts or updates a device registration.
 func (s *Store) UpsertDevice(info protocol.DeviceInfo) error {
 	healthBytes, _ := json.Marshal(info.Metrics)
 	_, err := s.db.Exec(`
-		INSERT INTO Devices (DeviceId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO Devices (DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(DeviceId) DO UPDATE SET
+			UserId = CASE WHEN excluded.UserId != '' THEN excluded.UserId ELSE Devices.UserId END,
 			Hostname = excluded.Hostname,
 			OS = excluded.OS,
 			Status = excluded.Status,
 			LastHeartbeat = excluded.LastHeartbeat,
 			ConnectedAt = excluded.ConnectedAt,
 			HealthJSON = excluded.HealthJSON
-	`, info.DeviceID, info.Hostname, info.OS, info.Status, info.LastHeartbeat, info.ConnectedAt, string(healthBytes))
+	`, info.DeviceID, info.UserID, info.Hostname, info.OS, info.Status, info.LastHeartbeat, info.ConnectedAt, string(healthBytes))
 	return err
 }
 
@@ -166,19 +182,23 @@ func (s *Store) UpdateDeviceStatus(deviceID string, status string) error {
 func (s *Store) GetDevice(deviceID string) (*protocol.DeviceInfo, error) {
 	var (
 		d           protocol.DeviceInfo
+		userID      sql.NullString
 		healthStr   sql.NullString
 		lastHB      int64
 		connectedAt int64
 	)
 	err := s.db.QueryRow(`
-		SELECT DeviceId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
+		SELECT DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
 		  FROM Devices WHERE DeviceId = ?
-	`, deviceID).Scan(&d.DeviceID, &d.Hostname, &d.OS, &d.Status, &lastHB, &connectedAt, &healthStr)
+	`, deviceID).Scan(&d.DeviceID, &userID, &d.Hostname, &d.OS, &d.Status, &lastHB, &connectedAt, &healthStr)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if userID.Valid {
+		d.UserID = userID.String
 	}
 	d.LastHeartbeat = lastHB
 	d.ConnectedAt = connectedAt
@@ -191,7 +211,7 @@ func (s *Store) GetDevice(deviceID string) (*protocol.DeviceInfo, error) {
 // ListDevices returns all registered devices.
 func (s *Store) ListDevices() ([]protocol.DeviceInfo, error) {
 	rows, err := s.db.Query(`
-		SELECT DeviceId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
+		SELECT DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
 		  FROM Devices ORDER BY LastHeartbeat DESC
 	`)
 	if err != nil {
@@ -203,10 +223,14 @@ func (s *Store) ListDevices() ([]protocol.DeviceInfo, error) {
 	for rows.Next() {
 		var (
 			d         protocol.DeviceInfo
+			userID    sql.NullString
 			healthStr sql.NullString
 		)
-		if err := rows.Scan(&d.DeviceID, &d.Hostname, &d.OS, &d.Status, &d.LastHeartbeat, &d.ConnectedAt, &healthStr); err != nil {
+		if err := rows.Scan(&d.DeviceID, &userID, &d.Hostname, &d.OS, &d.Status, &d.LastHeartbeat, &d.ConnectedAt, &healthStr); err != nil {
 			return nil, err
+		}
+		if userID.Valid {
+			d.UserID = userID.String
 		}
 		if healthStr.Valid && healthStr.String != "" {
 			_ = json.Unmarshal([]byte(healthStr.String), &d.Metrics)
@@ -214,6 +238,128 @@ func (s *Store) ListDevices() ([]protocol.DeviceInfo, error) {
 		list = append(list, d)
 	}
 	return list, rows.Err()
+}
+
+// --- User Management & Scoped Devices ---
+
+// CreateUser registers a new user with plain/viewable password and generates a unique AuthToken.
+func (s *Store) CreateUser(username, password string) (*protocol.UserAccount, error) {
+	if username == "" || password == "" {
+		return nil, fmt.Errorf("username and password cannot be empty")
+	}
+	userID := "usr_" + uuid.NewString()[:8]
+	authToken := "usr_tok_" + uuid.NewString()[:12]
+	now := time.Now().Unix()
+
+	_, err := s.db.Exec(`
+		INSERT INTO Users (UserId, Username, Password, AuthToken, CreatedAt)
+		VALUES (?, ?, ?, ?, ?)
+	`, userID, username, password, authToken, now)
+	if err != nil {
+		return nil, fmt.Errorf("username %q is already taken", username)
+	}
+
+	return &protocol.UserAccount{
+		UserID:    userID,
+		Username:  username,
+		Password:  password,
+		AuthToken: authToken,
+		CreatedAt: now,
+	}, nil
+}
+
+// AuthenticateUser checks username and password and returns the user record.
+func (s *Store) AuthenticateUser(username, password string) (*protocol.UserAccount, error) {
+	var u protocol.UserAccount
+	err := s.db.QueryRow(`
+		SELECT UserId, Username, Password, AuthToken, CreatedAt
+		  FROM Users
+		 WHERE Username = ? AND Password = ?
+	`, username, password).Scan(&u.UserID, &u.Username, &u.Password, &u.AuthToken, &u.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("invalid username or password")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// GetUserByToken finds a user by their AuthToken.
+func (s *Store) GetUserByToken(token string) (*protocol.UserAccount, error) {
+	if token == "" {
+		return nil, nil
+	}
+	var u protocol.UserAccount
+	err := s.db.QueryRow(`
+		SELECT UserId, Username, Password, AuthToken, CreatedAt
+		  FROM Users
+		 WHERE AuthToken = ?
+	`, token).Scan(&u.UserID, &u.Username, &u.Password, &u.AuthToken, &u.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// GetUserByUsername finds a user by username.
+func (s *Store) GetUserByUsername(username string) (*protocol.UserAccount, error) {
+	var u protocol.UserAccount
+	err := s.db.QueryRow(`
+		SELECT UserId, Username, Password, AuthToken, CreatedAt
+		  FROM Users
+		 WHERE Username = ?
+	`, username).Scan(&u.UserID, &u.Username, &u.Password, &u.AuthToken, &u.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// ListDevicesForUser returns devices belonging to the specified user (or unclaimed if user has no devices yet).
+func (s *Store) ListDevicesForUser(userID string) ([]protocol.DeviceInfo, error) {
+	rows, err := s.db.Query(`
+		SELECT DeviceId, UserId, Hostname, OS, Status, LastHeartbeat, ConnectedAt, HealthJSON
+		  FROM Devices
+		 WHERE UserId = ? OR (UserId = '' AND ? != '')
+		 ORDER BY LastHeartbeat DESC
+	`, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []protocol.DeviceInfo
+	for rows.Next() {
+		var (
+			d         protocol.DeviceInfo
+			uID       sql.NullString
+			healthStr sql.NullString
+		)
+		if err := rows.Scan(&d.DeviceID, &uID, &d.Hostname, &d.OS, &d.Status, &d.LastHeartbeat, &d.ConnectedAt, &healthStr); err != nil {
+			return nil, err
+		}
+		if uID.Valid {
+			d.UserID = uID.String
+		}
+		if healthStr.Valid && healthStr.String != "" {
+			_ = json.Unmarshal([]byte(healthStr.String), &d.Metrics)
+		}
+		list = append(list, d)
+	}
+	return list, rows.Err()
+}
+
+// BindDeviceToUser associates a device with a user.
+func (s *Store) BindDeviceToUser(deviceID, userID string) error {
+	_, err := s.db.Exec(`UPDATE Devices SET UserId = ? WHERE DeviceId = ?`, userID, deviceID)
+	return err
 }
 
 // EnqueueCommand stores a new command for a device with Status = PENDING.

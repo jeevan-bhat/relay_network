@@ -64,6 +64,21 @@ $deviceID = Read-Host "Enter Device ID [Press Enter for '$defaultDevice']"
 if ([string]::IsNullOrWhiteSpace($deviceID)) {
     $deviceID = $defaultDevice
 }
+$deviceID = $deviceID.Trim()
+
+$existingToken = ""
+if (Test-Path "C:\ProgramData\TerminalAgent\config.json") {
+    try {
+        $prev = Get-Content "C:\ProgramData\TerminalAgent\config.json" -Raw | ConvertFrom-Json
+        if ($prev.auth_token) { $existingToken = $prev.auth_token }
+    } catch {}
+}
+
+$authToken = Read-Host "Enter Account Pairing Token [Press Enter for '$existingToken']"
+if ([string]::IsNullOrWhiteSpace($authToken)) {
+    $authToken = $existingToken
+}
+$authToken = $authToken.Trim()
 
 Write-Host ""
 Write-Host "Connecting device '$deviceID' to '$relayURL'..." -ForegroundColor Cyan
@@ -72,6 +87,7 @@ Write-Host "Connecting device '$deviceID' to '$relayURL'..." -ForegroundColor Cy
 $configObj = [PSCustomObject]@{
     relay_url          = $relayURL
     device_id          = $deviceID
+    auth_token         = $authToken
     db_path            = "C:\ProgramData\TerminalAgent\queue.db"
     heartbeat_interval = "15s"
 }

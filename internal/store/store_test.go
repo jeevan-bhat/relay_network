@@ -159,3 +159,73 @@ func TestSaveAndListResults(t *testing.T) {
 		t.Fatalf("list results: %v, len=%d", err, len(list))
 	}
 }
+
+func TestUserAuthenticationAndDeviceScoping(t *testing.T) {
+	st := newTestStore(t)
+
+	// 1. Create User
+	u1, err := st.CreateUser("jeevan", "mysecret123")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if u1.Username != "jeevan" || u1.Password != "mysecret123" || u1.AuthToken == "" {
+		t.Fatalf("unexpected user: %+v", u1)
+	}
+
+	// Duplicate username should fail
+	if _, err := st.CreateUser("jeevan", "other"); err == nil {
+		t.Fatalf("expected duplicate username error")
+	}
+
+	// 2. Authenticate
+	authU, err := st.AuthenticateUser("jeevan", "mysecret123")
+	if err != nil || authU.UserID != u1.UserID {
+		t.Fatalf("authenticate user: %v", err)
+	}
+	if _, err := st.AuthenticateUser("jeevan", "wrongpass"); err == nil {
+		t.Fatalf("expected auth error with wrong password")
+	}
+
+	// 3. Lookup by Token
+	tokU, err := st.GetUserByToken(u1.AuthToken)
+	if err != nil || tokU == nil || tokU.UserID != u1.UserID {
+		t.Fatalf("get by token: %v, got=%+v", err, tokU)
+	}
+
+	// 4. Create second user
+	u2, err := st.CreateUser("user2", "pass2")
+	if err != nil {
+		t.Fatalf("create user2: %v", err)
+	}
+
+	// 5. Add devices and bind
+	_ = st.UpsertDevice(protocol.DeviceInfo{
+		DeviceID: "laptop-jeevan",
+		UserID:   u1.UserID,
+		Hostname: "ASUS-ROG",
+		Status:   protocol.StatusOnline,
+	})
+	_ = st.UpsertDevice(protocol.DeviceInfo{
+		DeviceID: "laptop-user2",
+		UserID:   u2.UserID,
+		Hostname: "DELL-XPS",
+		Status:   protocol.StatusOnline,
+	})
+
+	// 6. Test User-Scoped Device Lists
+	devsU1, err := st.ListDevicesForUser(u1.UserID)
+	if err != nil {
+		t.Fatalf("list devices u1: %v", err)
+	}
+	if len(devsU1) != 1 || devsU1[0].DeviceID != "laptop-jeevan" {
+		t.Fatalf("u1 devices mismatch: %+v", devsU1)
+	}
+
+	devsU2, err := st.ListDevicesForUser(u2.UserID)
+	if err != nil {
+		t.Fatalf("list devices u2: %v", err)
+	}
+	if len(devsU2) != 1 || devsU2[0].DeviceID != "laptop-user2" {
+		t.Fatalf("u2 devices mismatch: %+v", devsU2)
+	}
+}

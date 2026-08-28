@@ -42,6 +42,7 @@ type Client struct {
 	role      string // protocol.RoleAgent or protocol.RoleController
 	deviceID  string // device identifier if agent
 	sessionID string
+	userID    string // associated user ID if authenticated
 	authed    bool
 	mu        sync.Mutex
 }
@@ -233,7 +234,13 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 		return
 	}
 
-	if h.cfg.AuthToken != "" && p.Token != h.cfg.AuthToken {
+	var authenticatedUser *protocol.UserAccount
+	if p.Token != "" {
+		authenticatedUser, _ = h.store.GetUserByToken(p.Token)
+	}
+
+	// If global token is set and no user account matched, verify global token
+	if authenticatedUser == nil && h.cfg.AuthToken != "" && p.Token != h.cfg.AuthToken {
 		ack, _ := protocol.NewEnvelope(protocol.TypeAuthAck, p.DeviceID, protocol.AuthAckPayload{
 			Success:    false,
 			Error:      "unauthorized: invalid token",
@@ -247,6 +254,9 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 	c.role = p.Role
 	c.deviceID = p.DeviceID
 	c.authed = true
+	if authenticatedUser != nil {
+		c.userID = authenticatedUser.UserID
+	}
 	c.mu.Unlock()
 
 	h.mu.Lock()
@@ -265,12 +275,16 @@ func (h *Hub) handleAuth(c *Client, env protocol.Envelope) {
 			LastHeartbeat: time.Now().Unix(),
 			ConnectedAt:   time.Now().Unix(),
 		}
+		if authenticatedUser != nil {
+			devInfo.UserID = authenticatedUser.UserID
+			_ = h.store.BindDeviceToUser(p.DeviceID, authenticatedUser.UserID)
+		}
 		_ = h.store.UpsertDevice(devInfo)
-		h.log.Info("agent authenticated", "deviceId", p.DeviceID, "host", p.Hostname)
+		h.log.Info("agent authenticated", "deviceId", p.DeviceID, "host", p.Hostname, "userId", devInfo.UserID)
 		h.broadcastDeviceStatusLocked(p.DeviceID, protocol.StatusOnline)
 	} else {
 		h.controllers[c] = true
-		h.log.Info("controller authenticated", "sessionId", c.sessionID)
+		h.log.Info("controller authenticated", "sessionId", c.sessionID, "userId", c.userID)
 	}
 	h.mu.Unlock()
 
@@ -306,8 +320,15 @@ func (h *Hub) handleHeartbeat(c *Client, env protocol.Envelope) {
 	})
 	c.Send(ack)
 
-	// Broadcast updated metrics & status to controllers
-	h.broadcastToControllers(env)
+	// Broadcast updated metrics & status to matching controllers
+	hbEnv, _ := protocol.NewEnvelope(protocol.TypeHeartbeat, p.DeviceID, p)
+	h.mu.RLock()
+	for ctrl := range h.controllers {
+		if c.userID == "" || ctrl.userID == "" || ctrl.userID == c.userID {
+			ctrl.Send(hbEnv)
+		}
+	}
+	h.mu.RUnlock()
 }
 
 func (h *Hub) handleEnqueueCmd(c *Client, env protocol.Envelope) {
@@ -449,7 +470,16 @@ func (h *Hub) handleSyncReq(c *Client, env protocol.Envelope) {
 }
 
 func (h *Hub) GetDevices() []protocol.DeviceInfo {
-	devices, _ := h.store.ListDevices()
+	return h.GetDevicesForUser("")
+}
+
+func (h *Hub) GetDevicesForUser(userID string) []protocol.DeviceInfo {
+	var devices []protocol.DeviceInfo
+	if userID != "" {
+		devices, _ = h.store.ListDevicesForUser(userID)
+	} else {
+		devices, _ = h.store.ListDevices()
+	}
 	if devices == nil {
 		devices = []protocol.DeviceInfo{}
 	}
@@ -464,10 +494,11 @@ func (h *Hub) GetDevices() []protocol.DeviceInfo {
 			devices[i].Status = protocol.StatusOnline
 		}
 	}
-	for devID := range h.agents {
-		if !devMap[devID] {
+	for devID, agentClient := range h.agents {
+		if !devMap[devID] && (userID == "" || agentClient.userID == "" || agentClient.userID == userID) {
 			devices = append(devices, protocol.DeviceInfo{
 				DeviceID:      devID,
+				UserID:        agentClient.userID,
 				Status:        protocol.StatusOnline,
 				LastHeartbeat: time.Now().Unix(),
 				ConnectedAt:   time.Now().Unix(),
@@ -478,7 +509,7 @@ func (h *Hub) GetDevices() []protocol.DeviceInfo {
 }
 
 func (h *Hub) handleGetDevices(c *Client) {
-	devices := h.GetDevices()
+	devices := h.GetDevicesForUser(c.userID)
 	env, _ := protocol.NewEnvelope(protocol.TypeDeviceList, "", protocol.DeviceListPayload{
 		Devices: devices,
 	})
@@ -533,8 +564,11 @@ func (h *Hub) broadcastDeviceStatusLocked(deviceID, status string) {
 		"deviceId": deviceID,
 		"status":   status,
 	})
+	agentClient := h.agents[deviceID]
 	for c := range h.controllers {
-		c.Send(env)
+		if agentClient == nil || c.userID == "" || agentClient.userID == "" || c.userID == agentClient.userID {
+			c.Send(env)
+		}
 	}
 }
 

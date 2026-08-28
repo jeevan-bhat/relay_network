@@ -48,6 +48,9 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	})
 
 	// REST API
+	mux.HandleFunc("/api/auth/register", s.handleRegister)
+	mux.HandleFunc("/api/auth/login", s.handleLogin)
+	mux.HandleFunc("/api/auth/me", s.handleAuthMe)
 	mux.HandleFunc("/api/devices", s.handleDevices)
 	mux.HandleFunc("/api/commands", s.handleCommands)
 	mux.HandleFunc("/api/results", s.handleResults)
@@ -66,12 +69,113 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("/", fileServer)
 }
 
+func (s *Server) extractToken(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimSpace(auth[7:])
+	}
+	if tok := r.URL.Query().Get("token"); tok != "" {
+		return strings.TrimSpace(tok)
+	}
+	return ""
+}
+
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req protocol.UserAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{Success: false, Error: "Invalid request payload"})
+		return
+	}
+	user, err := s.store.CreateUser(req.Username, req.Password)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{Success: false, Error: err.Error()})
+		return
+	}
+	devices := s.hub.GetDevicesForUser(user.UserID)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{
+		Success: true,
+		User:    user,
+		Devices: devices,
+	})
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req protocol.UserAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{Success: false, Error: "Invalid request payload"})
+		return
+	}
+	user, err := s.store.AuthenticateUser(req.Username, req.Password)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{Success: false, Error: err.Error()})
+		return
+	}
+	devices := s.hub.GetDevicesForUser(user.UserID)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{
+		Success: true,
+		User:    user,
+		Devices: devices,
+	})
+}
+
+func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {
+	token := s.extractToken(r)
+	if token == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{Success: false, Error: "No token provided"})
+		return
+	}
+	user, err := s.store.GetUserByToken(token)
+	if err != nil || user == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{Success: false, Error: "Invalid session token"})
+		return
+	}
+	devices := s.hub.GetDevicesForUser(user.UserID)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(protocol.UserAuthResponse{
+		Success: true,
+		User:    user,
+		Devices: devices,
+	})
+}
+
 func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	devices := s.hub.GetDevices()
+	token := s.extractToken(r)
+	var devices []protocol.DeviceInfo
+	if token != "" {
+		if u, _ := s.store.GetUserByToken(token); u != nil {
+			devices = s.hub.GetDevicesForUser(u.UserID)
+		} else {
+			devices = s.hub.GetDevices()
+		}
+	} else {
+		devices = s.hub.GetDevices()
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(devices)
 }

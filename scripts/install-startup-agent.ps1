@@ -35,12 +35,14 @@ Write-Host "[OK] Agent binary placed at: $destExe" -ForegroundColor Green
 $configPath = Join-Path $agentDir "config.json"
 $existingRelay = "wss://relay-network.onrender.com/ws"
 $existingDevice = $env:COMPUTERNAME.ToLower()
+$existingToken = ""
 
 if (Test-Path "C:\ProgramData\TerminalAgent\config.json") {
     try {
         $prev = Get-Content "C:\ProgramData\TerminalAgent\config.json" -Raw | ConvertFrom-Json
         if ($prev.relay_url) { $existingRelay = $prev.relay_url }
         if ($prev.device_id) { $existingDevice = $prev.device_id }
+        if ($prev.auth_token) { $existingToken = $prev.auth_token }
     } catch {}
 }
 
@@ -67,11 +69,19 @@ $deviceID = Read-Host "Enter Device ID [Press Enter for '$existingDevice']"
 if ([string]::IsNullOrWhiteSpace($deviceID)) {
     $deviceID = $existingDevice
 }
+$deviceID = $deviceID.Trim()
+
+$authToken = Read-Host "Enter Account Pairing Token [Press Enter for '$existingToken']"
+if ([string]::IsNullOrWhiteSpace($authToken)) {
+    $authToken = $existingToken
+}
+$authToken = $authToken.Trim()
 
 # 3. Save Config
 $configObj = [PSCustomObject]@{
     relay_url          = $relayURL
     device_id          = $deviceID
+    auth_token         = $authToken
     db_path            = (Join-Path $agentDir "queue.db")
     heartbeat_interval = "15s"
 }
