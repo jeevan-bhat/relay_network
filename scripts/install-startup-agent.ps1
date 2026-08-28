@@ -29,7 +29,7 @@ $destExe = Join-Path $agentDir "terminal-agent.exe"
 Stop-Process -Name "terminal-agent" -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
 Copy-Item -Path $srcExe -Destination $destExe -Force
-Write-Host "[✓] Agent binary placed at: $destExe" -ForegroundColor Green
+Write-Host "[OK] Agent binary placed at: $destExe" -ForegroundColor Green
 
 # 2. Check existing config or prompt
 $configPath = Join-Path $agentDir "config.json"
@@ -76,7 +76,7 @@ $configObj = [PSCustomObject]@{
     heartbeat_interval = "15s"
 }
 $configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8
-Write-Host "[✓] Configuration saved to $configPath" -ForegroundColor Green
+Write-Host "[OK] Configuration saved to $configPath" -ForegroundColor Green
 
 # Also save to ProgramData if accessible
 try {
@@ -89,13 +89,14 @@ try {
 # 4. Create Invisible Startup Launcher in Windows Startup Folder
 $startupFolder = [Environment]::GetFolderPath("Startup")
 $vbsPath = Join-Path $startupFolder "TerminalAgent.vbs"
-$vbsContent = "Set WshShell = CreateObject(`"WScript.Shell`")`r`nWshShell.Run `"`"`"$destExe`"`" run`", 0, False"
-Set-Content -Path $vbsPath -Value $vbsContent -Force
-Write-Host "[✓] Registered in Windows Startup: $vbsPath" -ForegroundColor Green
+$line1 = 'Set WshShell = CreateObject("WScript.Shell")'
+$line2 = 'WshShell.Run """{0}"" run", 0, False' -f $destExe
+Set-Content -Path $vbsPath -Value @($line1, $line2) -Force
+Write-Host "[OK] Registered in Windows Startup: $vbsPath" -ForegroundColor Green
 
 # 5. Launch immediately in background
 Write-Host "Starting agent in background..." -ForegroundColor Yellow
-Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbsPath`""
+Start-Process -FilePath "wscript.exe" -ArgumentList $vbsPath
 
 Start-Sleep -Seconds 2
 
@@ -105,10 +106,10 @@ if ($proc) {
     Write-Host "==========================================================" -ForegroundColor Green
     Write-Host "  SUCCESS! Terminal Agent is now permanently running." -ForegroundColor Green
     Write-Host "==========================================================" -ForegroundColor Green
-    Write-Host "• It will start automatically in background every time your laptop boots." -ForegroundColor White
-    Write-Host "• No terminal window or popups will ever appear." -ForegroundColor White
-    Write-Host "• Connected to: $relayURL" -ForegroundColor Cyan
-    Write-Host "• Device ID:   $deviceID" -ForegroundColor Cyan
+    Write-Host "  It will start automatically in background on every boot." -ForegroundColor White
+    Write-Host "  No terminal window or popups will ever appear." -ForegroundColor White
+    Write-Host "  Connected to: $relayURL" -ForegroundColor Cyan
+    Write-Host "  Device ID:   $deviceID" -ForegroundColor Cyan
     Write-Host "==========================================================" -ForegroundColor Green
 } else {
     Write-Host "Agent installed to startup. To run immediately, open scripts\start-agent.bat." -ForegroundColor Yellow

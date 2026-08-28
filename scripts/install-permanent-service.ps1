@@ -36,7 +36,7 @@ if (-not (Test-Path $srcExe)) {
 if (-not (Test-Path $srcExe)) {
     Write-Host "Error: Could not locate terminal-agent.exe. Please build it first." -ForegroundColor Red
     Write-Host "Press any key to exit..."
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    $null = [Console]::ReadKey()
     exit 1
 }
 
@@ -77,7 +77,7 @@ $configObj = [PSCustomObject]@{
 }
 $configPath = Join-Path $agentDir "config.json"
 $configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8
-Write-Host "[✓] Configuration saved to $configPath" -ForegroundColor Green
+Write-Host "[OK] Configuration saved to $configPath" -ForegroundColor Green
 
 # 5. Stop and uninstall any old service version
 Stop-Process -Name "terminal-agent" -Force -ErrorAction SilentlyContinue
@@ -92,7 +92,7 @@ if (Get-Service -Name "TerminalAgent" -ErrorAction SilentlyContinue) {
 # 6. Copy binary to ProgramData
 $destExe = Join-Path $agentDir "terminal-agent.exe"
 Copy-Item -Path $srcExe -Destination $destExe -Force
-Write-Host "[✓] Installed executable to $destExe" -ForegroundColor Green
+Write-Host "[OK] Installed executable to $destExe" -ForegroundColor Green
 
 # 7. Register and Start Service via Windows SCM
 Write-Host "Installing Windows Service (Automatic Startup on Boot)..." -ForegroundColor Yellow
@@ -122,15 +122,14 @@ if ($svc -and $svc.Status -eq "Running") {
     Write-Host "==========================================================" -ForegroundColor Green
     Write-Host "  SUCCESS! Terminal Agent is now permanently running." -ForegroundColor Green
     Write-Host "==========================================================" -ForegroundColor Green
-    Write-Host "• It will start automatically every time your laptop powers on." -ForegroundColor White
-    Write-Host "• You NEVER need to open a terminal or run a command again." -ForegroundColor White
-    Write-Host "• Cloud Relay: $relayURL" -ForegroundColor Cyan
-    Write-Host "• Device ID:   $deviceID" -ForegroundColor Cyan
+    Write-Host "  It will start automatically every time your laptop powers on." -ForegroundColor White
+    Write-Host "  You NEVER need to open a terminal or run a command again." -ForegroundColor White
+    Write-Host "  Cloud Relay: $relayURL" -ForegroundColor Cyan
+    Write-Host "  Device ID:   $deviceID" -ForegroundColor Cyan
     Write-Host "==========================================================" -ForegroundColor Green
 } else {
     Write-Host "Service status: $($svc.Status)" -ForegroundColor Yellow
 }
 
 Write-Host ""
-Write-Host "Press any key to exit..." -ForegroundColor Gray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "Setup complete." -ForegroundColor Gray
