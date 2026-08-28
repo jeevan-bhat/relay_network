@@ -3,6 +3,7 @@ package web
 
 import (
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"terminalrelay/internal/hub"
 	"terminalrelay/internal/protocol"
@@ -392,7 +394,70 @@ func (s *Server) handleDownloadInstaller(w http.ResponseWriter, r *http.Request)
 	relayURL := wsProto + host + "/ws"
 	downloadExeURL := httpProto + host + "/api/download/terminal-agent.exe"
 
-	script := fmt.Sprintf(`@echo off
+	psScript := fmt.Sprintf(`
+$agentDir = "$env:LOCALAPPDATA\TerminalAgent"
+if (-not (Test-Path $agentDir)) {
+    New-Item -ItemType Directory -Path $agentDir -Force | Out-Null
+}
+$destExe = Join-Path $agentDir "terminal-agent.exe"
+Stop-Process -Name "terminal-agent" -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+
+if (-not (Test-Path $destExe)) {
+    if (Test-Path "terminal-agent.exe") {
+        Copy-Item "terminal-agent.exe" $destExe -Force
+    } elseif (Test-Path "..\agent\terminal-agent.exe") {
+        Copy-Item "..\agent\terminal-agent.exe" $destExe -Force
+    } else {
+        Write-Host "Downloading agent binary from cloud..." -ForegroundColor Yellow
+        try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -Uri "%s" -OutFile $destExe -UseBasicParsing
+        } catch {
+            try {
+                Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe" -OutFile $destExe -UseBasicParsing
+            } catch {
+                Write-Host "Notice: Agent binary will use local copy." -ForegroundColor Gray
+            }
+        }
+    }
+}
+
+$configPath = Join-Path $agentDir "config.json"
+$configObj = [PSCustomObject]@{
+    relay_url          = "%s"
+    device_id          = $env:COMPUTERNAME.ToLower()
+    auth_token         = "%s"
+    db_path            = (Join-Path $agentDir "queue.db")
+    heartbeat_interval = "15s"
+}
+$configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8
+
+$startupFolder = [Environment]::GetFolderPath("Startup")
+$shortcutPath = Join-Path $startupFolder "TerminalAgent.lnk"
+try {
+    $wsh = New-Object -ComObject WScript.Shell
+    $sc = $wsh.CreateShortcut($shortcutPath)
+    $sc.TargetPath = $destExe
+    $sc.Arguments = "run"
+    $sc.WindowStyle = 7
+    $sc.Save()
+} catch {}
+
+Start-Process -FilePath $destExe -ArgumentList "run" -WindowStyle Hidden
+Write-Host ""
+Write-Host "==========================================================" -ForegroundColor Green
+Write-Host "  SUCCESS! Laptop paired and running permanently." -ForegroundColor Green
+Write-Host ("  Device ID: " + $env:COMPUTERNAME.ToLower()) -ForegroundColor Cyan
+Write-Host "  Relay URL: %s" -ForegroundColor Cyan
+Write-Host "==========================================================" -ForegroundColor Green
+Write-Host ""
+`, downloadExeURL, relayURL, token, relayURL)
+
+	utf16Bytes := utf16Encode(psScript)
+	encodedCommand := base64.StdEncoding.EncodeToString(utf16Bytes)
+
+	batContent := fmt.Sprintf(`@echo off
 setlocal
 title Terminal Agent - 1-Click Laptop Installer
 cd /d "%%~dp0"
@@ -400,52 +465,26 @@ echo ==========================================================
 echo   Terminal Agent - 1-Click Laptop Auto-Start Setup
 echo ==========================================================
 echo.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$agentDir = \"$env:LOCALAPPDATA\TerminalAgent\"; " ^
-  "if (-not (Test-Path $agentDir)) { New-Item -ItemType Directory -Path $agentDir -Force | Out-Null }; " ^
-  "$destExe = Join-Path $agentDir \"terminal-agent.exe\"; " ^
-  "Stop-Process -Name \"terminal-agent\" -Force -ErrorAction SilentlyContinue; " ^
-  "Start-Sleep -Milliseconds 500; " ^
-  "if (-not (Test-Path $destExe)) { " ^
-  "  if (Test-Path \"terminal-agent.exe\") { Copy-Item \"terminal-agent.exe\" $destExe -Force } " ^
-  "  elseif (Test-Path \"..\agent\terminal-agent.exe\") { Copy-Item \"..\agent\terminal-agent.exe\" $destExe -Force } " ^
-  "  else { " ^
-  "    Write-Host 'Downloading agent binary from cloud...' -ForegroundColor Yellow; " ^
-  "    try { Invoke-WebRequest -Uri '%s' -OutFile $destExe -UseBasicParsing } catch { " ^
-  "      try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe' -OutFile $destExe -UseBasicParsing } catch { " ^
-  "        Write-Host 'Connecting with local agent.' -ForegroundColor Gray " ^
-  "      } " ^
-  "    } " ^
-  "  } " ^
-  "}; " ^
-  "$configPath = Join-Path $agentDir \"config.json\"; " ^
-  "$configObj = [PSCustomObject]@{ " ^
-  "  relay_url = '%s'; " ^
-  "  device_id = $env:COMPUTERNAME.ToLower(); " ^
-  "  auth_token = '%s'; " ^
-  "  db_path = (Join-Path $agentDir \"queue.db\"); " ^
-  "  heartbeat_interval = \"15s\" " ^
-  "$configObj | ConvertTo-Json -Depth 4 | Set-Content -Path $configPath -Force -Encoding UTF8; " ^
-  "try { $configObj | ConvertTo-Json -Depth 4 | Set-Content -Path \"C:\ProgramData\TerminalAgent\config.json\" -Force -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}; " ^
-  "$startupFolder = [Environment]::GetFolderPath(\"Startup\"); " ^
-  "$shortcutPath = Join-Path $startupFolder \"TerminalAgent.lnk\"; " ^
-  "try { $wsh = New-Object -ComObject WScript.Shell; $sc = $wsh.CreateShortcut($shortcutPath); $sc.TargetPath = $destExe; $sc.Arguments = 'run'; $sc.WindowStyle = 7; $sc.Save() } catch {}; " ^
-  "Start-Process -FilePath $destExe -ArgumentList 'run' -WindowStyle Hidden; " ^
-  "Write-Host ''; " ^
-  "Write-Host '==========================================================' -ForegroundColor Green; " ^
-  "Write-Host '  SUCCESS! Laptop paired and running permanently.' -ForegroundColor Green; " ^
-  "Write-Host '  Device ID: ' $env:COMPUTERNAME.ToLower() -ForegroundColor Cyan; " ^
-  "Write-Host '  Relay URL: %s' -ForegroundColor Cyan; " ^
-  "Write-Host '==========================================================' -ForegroundColor Green; "
+powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand %s
 echo.
 echo Setup complete. You can close this window.
 pause
-`, downloadExeURL, relayURL, token, relayURL)
+`, encodedCommand)
 
 	w.Header().Set("Content-Type", "application/x-bat; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="install-startup-agent.bat"`)
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(script))
+	_, _ = w.Write([]byte(batContent))
+}
+
+func utf16Encode(s string) []byte {
+	runes := utf16.Encode([]rune(s))
+	bytes := make([]byte, len(runes)*2)
+	for i, r := range runes {
+		bytes[i*2] = byte(r)
+		bytes[i*2+1] = byte(r >> 8)
+	}
+	return bytes
 }
 
 func (s *Server) handleDownloadAgentExe(w http.ResponseWriter, r *http.Request) {
