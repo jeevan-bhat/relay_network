@@ -39,17 +39,10 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", s.hub.HandleWS)
 
-	// Health check endpoints for cloud load balancers (Render, Fly.io, Kubernetes)
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	// Health check endpoints for cloud load balancers (Render, Fly.io, Kubernetes) and REST clients
+	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/healthz", s.handleHealth)
+	mux.HandleFunc("/api/health", s.handleHealth)
 
 	// REST API
 	mux.HandleFunc("/api/system/status", s.handleSystemStatus)
@@ -366,6 +359,32 @@ func sendMagicPacket(macStr, broadcastIP string) error {
 
 	_, err = conn.Write(packet)
 	return err
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	backend := "sqlite"
+	if s.store.IsSupabase() {
+		backend = "supabase"
+	}
+	devices := s.hub.GetDevices()
+	onlineCount := 0
+	for _, d := range devices {
+		if d.Status == protocol.StatusOnline {
+			onlineCount++
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":          "ok",
+		"timestamp":       time.Now().Unix(),
+		"version":         "4.0",
+		"service":         "terminal-relay",
+		"storage_backend": backend,
+		"total_devices":   len(devices),
+		"online_devices":  onlineCount,
+	})
 }
 
 func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
