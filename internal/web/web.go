@@ -401,39 +401,41 @@ if (-not (Test-Path $agentDir)) {
     New-Item -ItemType Directory -Path $agentDir -Force | Out-Null
 }
 $destExe = Join-Path $agentDir "terminal-agent.exe"
+
+# Stop existing processes and services so binary can be upgraded
+Stop-Service -Name "TerminalAgent" -Force -ErrorAction SilentlyContinue
 Stop-Process -Name "terminal-agent" -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 500
+Start-Sleep -Milliseconds 600
 
-$item = Get-Item -Path $destExe -ErrorAction SilentlyContinue
-$isValid = ($item -ne $null -and $item.Length -gt 100000)
+$copied = $false
+# 1. Try local disk binary if available
+$localExe = Get-Item -Path "terminal-agent.exe" -ErrorAction SilentlyContinue
+if ($localExe -ne $null -and $localExe.Length -gt 100000) {
+    try { Copy-Item -Path $localExe.FullName -Destination $destExe -Force; $copied = $true } catch {}
+}
+if (-not $copied) {
+    $parentExe = Get-Item -Path "..\agent\terminal-agent.exe" -ErrorAction SilentlyContinue
+    if ($parentExe -ne $null -and $parentExe.Length -gt 100000) {
+        try { Copy-Item -Path $parentExe.FullName -Destination $destExe -Force; $copied = $true } catch {}
+    }
+}
 
-if (-not $isValid) {
-    $localExe = Get-Item -Path "terminal-agent.exe" -ErrorAction SilentlyContinue
-    if ($localExe -ne $null -and $localExe.Length -gt 100000) {
-        Copy-Item -Path $localExe.FullName -Destination $destExe -Force
-        $isValid = $true
-    } else {
-        $parentExe = Get-Item -Path "..\agent\terminal-agent.exe" -ErrorAction SilentlyContinue
-        if ($parentExe -ne $null -and $parentExe.Length -gt 100000) {
-            Copy-Item -Path $parentExe.FullName -Destination $destExe -Force
-            $isValid = $true
-        } else {
-            Write-Host "Downloading agent binary from cloud..." -ForegroundColor Yellow
-            try {
-                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                Invoke-WebRequest -Uri "%s" -OutFile $destExe -UseBasicParsing
-                $downItem = Get-Item -Path $destExe -ErrorAction SilentlyContinue
-                if ($downItem -ne $null -and $downItem.Length -gt 100000) { $isValid = $true }
-            } catch {}
-            
-            if (-not $isValid) {
-                try {
-                    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe" -OutFile $destExe -UseBasicParsing
-                    $downItem = Get-Item -Path $destExe -ErrorAction SilentlyContinue
-                    if ($downItem -ne $null -and $downItem.Length -gt 100000) { $isValid = $true }
-                } catch {}
-            }
-        }
+# 2. Always fetch latest cloud binary
+if (-not $copied) {
+    Write-Host "Updating agent binary with Screen Capture & File Editor..." -ForegroundColor Yellow
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri "%s?v=%d" -OutFile $destExe -UseBasicParsing -Headers @{"Cache-Control"="no-cache"}
+        $downItem = Get-Item -Path $destExe -ErrorAction SilentlyContinue
+        if ($downItem -ne $null -and $downItem.Length -gt 100000) { $copied = $true }
+    } catch {}
+    
+    if (-not $copied) {
+        try {
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe" -OutFile $destExe -UseBasicParsing
+            $downItem = Get-Item -Path $destExe -ErrorAction SilentlyContinue
+            if ($downItem -ne $null -and $downItem.Length -gt 100000) { $copied = $true }
+        } catch {}
     }
 }
 
@@ -463,7 +465,7 @@ if (Test-Path $destExe) {
     Start-Process -FilePath $destExe -ArgumentList "run" -WindowStyle Hidden
     Write-Host ""
     Write-Host "==========================================================" -ForegroundColor Green
-    Write-Host "  SUCCESS! Laptop paired and running permanently." -ForegroundColor Green
+    Write-Host "  SUCCESS! Updated agent running with Screen Capture." -ForegroundColor Green
     Write-Host ("  Device ID: " + $env:COMPUTERNAME.ToLower()) -ForegroundColor Cyan
     Write-Host "  Relay URL: %s" -ForegroundColor Cyan
     Write-Host "==========================================================" -ForegroundColor Green
@@ -471,7 +473,7 @@ if (Test-Path $destExe) {
 } else {
     Write-Host "Error: Could not start agent. Please check your internet connection." -ForegroundColor Red
 }
-`, downloadExeURL, relayURL, token, relayURL)
+`, downloadExeURL, time.Now().Unix(), relayURL, token, relayURL)
 
 	utf16Bytes := utf16Encode(psScript)
 	encodedCommand := base64.StdEncoding.EncodeToString(utf16Bytes)

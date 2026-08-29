@@ -1,14 +1,18 @@
-// Package screen provides high-performance desktop screen capture using native Win32 GDI syscalls.
+// Package screen provides high-performance desktop screen capture using native Win32 GDI syscalls and PowerShell fallback.
 package screen
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
+	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -58,7 +62,15 @@ func CaptureScreen(deviceID string, quality, maxWidth int) (protocol.ScreenCaptu
 	}
 
 	if runtime.GOOS == "windows" {
-		return captureWindowsScreen(deviceID, quality, maxWidth)
+		res, err := captureWindowsScreen(deviceID, quality, maxWidth)
+		if err == nil && res.ImageBase64 != "" {
+			return res, nil
+		}
+		// Fallback to PowerShell CopyFromScreen in case of GDI session constraints
+		psRes, psErr := capturePowerShellScreen(deviceID, quality, maxWidth)
+		if psErr == nil && psRes.ImageBase64 != "" {
+			return psRes, nil
+		}
 	}
 	return captureFallbackScreen(deviceID, quality, maxWidth)
 }
@@ -76,40 +88,24 @@ func captureWindowsScreen(deviceID string, quality, maxWidth int) (protocol.Scre
 	w := int(wRaw)
 	h := int(hRaw)
 	if w <= 0 || h <= 0 {
-		return protocol.ScreenCaptureRespPayload{
-			DeviceID:  deviceID,
-			Timestamp: time.Now().Unix(),
-			Error:     "invalid screen metrics",
-		}, fmt.Errorf("invalid screen metrics: %dx%d", w, h)
+		return protocol.ScreenCaptureRespPayload{}, fmt.Errorf("invalid screen metrics: %dx%d", w, h)
 	}
 
 	hdc, _, _ := procGetDC.Call(0)
 	if hdc == 0 {
-		return protocol.ScreenCaptureRespPayload{
-			DeviceID:  deviceID,
-			Timestamp: time.Now().Unix(),
-			Error:     "GetDC failed",
-		}, fmt.Errorf("GetDC failed")
+		return protocol.ScreenCaptureRespPayload{}, fmt.Errorf("GetDC failed")
 	}
 	defer procReleaseDC.Call(0, hdc)
 
 	memDC, _, _ := procCreateCompatibleDC.Call(hdc)
 	if memDC == 0 {
-		return protocol.ScreenCaptureRespPayload{
-			DeviceID:  deviceID,
-			Timestamp: time.Now().Unix(),
-			Error:     "CreateCompatibleDC failed",
-		}, fmt.Errorf("CreateCompatibleDC failed")
+		return protocol.ScreenCaptureRespPayload{}, fmt.Errorf("CreateCompatibleDC failed")
 	}
 	defer procDeleteDC.Call(memDC)
 
 	hBitmap, _, _ := procCreateCompatibleBitmap.Call(hdc, uintptr(w), uintptr(h))
 	if hBitmap == 0 {
-		return protocol.ScreenCaptureRespPayload{
-			DeviceID:  deviceID,
-			Timestamp: time.Now().Unix(),
-			Error:     "CreateCompatibleBitmap failed",
-		}, fmt.Errorf("CreateCompatibleBitmap failed")
+		return protocol.ScreenCaptureRespPayload{}, fmt.Errorf("CreateCompatibleBitmap failed")
 	}
 	defer procDeleteObject.Call(hBitmap)
 
@@ -119,11 +115,7 @@ func captureWindowsScreen(deviceID string, quality, maxWidth int) (protocol.Scre
 	// SRCCOPY = 0x00CC0020
 	ret, _, err := procBitBlt.Call(memDC, 0, 0, uintptr(w), uintptr(h), hdc, 0, 0, 0x00CC0020)
 	if ret == 0 {
-		return protocol.ScreenCaptureRespPayload{
-			DeviceID:  deviceID,
-			Timestamp: time.Now().Unix(),
-			Error:     fmt.Sprintf("BitBlt failed: %v", err),
-		}, fmt.Errorf("BitBlt failed: %w", err)
+		return protocol.ScreenCaptureRespPayload{}, fmt.Errorf("BitBlt failed: %w", err)
 	}
 
 	bih := bitmapInfoHeader{
@@ -141,11 +133,7 @@ func captureWindowsScreen(deviceID string, quality, maxWidth int) (protocol.Scre
 	// DIB_RGB_COLORS = 0
 	ret, _, _ = procGetDIBits.Call(memDC, hBitmap, 0, uintptr(h), uintptr(unsafe.Pointer(&rawBytes[0])), uintptr(unsafe.Pointer(&bih)), 0)
 	if ret == 0 {
-		return protocol.ScreenCaptureRespPayload{
-			DeviceID:  deviceID,
-			Timestamp: time.Now().Unix(),
-			Error:     "GetDIBits failed",
-		}, fmt.Errorf("GetDIBits failed")
+		return protocol.ScreenCaptureRespPayload{}, fmt.Errorf("GetDIBits failed")
 	}
 
 	// Construct image
@@ -162,11 +150,7 @@ func captureWindowsScreen(deviceID string, quality, maxWidth int) (protocol.Scre
 
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
-		return protocol.ScreenCaptureRespPayload{
-			DeviceID:  deviceID,
-			Timestamp: time.Now().Unix(),
-			Error:     fmt.Sprintf("JPEG encode error: %v", err),
-		}, err
+		return protocol.ScreenCaptureRespPayload{}, err
 	}
 
 	b64 := base64.StdEncoding.EncodeToString(buf.Bytes())
@@ -179,12 +163,59 @@ func captureWindowsScreen(deviceID string, quality, maxWidth int) (protocol.Scre
 	}, nil
 }
 
+func capturePowerShellScreen(deviceID string, quality, maxWidth int) (protocol.ScreenCaptureRespPayload, error) {
+	psScript := `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$bmp = New-Object System.Drawing.Bitmap($b.Width, $b.Height)
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+$ms = New-Object System.IO.MemoryStream
+$bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+$b64 = [Convert]::ToBase64String($ms.ToArray())
+$bmp.Dispose()
+$g.Dispose()
+$ms.Dispose()
+Write-Output "$($b.Width):$($b.Height):$b64"
+`
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", psScript)
+	out, err := cmd.Output()
+	if err != nil {
+		return protocol.ScreenCaptureRespPayload{}, err
+	}
+
+	parts := strings.SplitN(strings.TrimSpace(string(out)), ":", 3)
+	if len(parts) != 3 || len(parts[2]) == 0 {
+		return protocol.ScreenCaptureRespPayload{}, fmt.Errorf("invalid powershell output")
+	}
+
+	w, _ := strconv.Atoi(parts[0])
+	h, _ := strconv.Atoi(parts[1])
+	if w <= 0 {
+		w = 1280
+	}
+	if h <= 0 {
+		h = 720
+	}
+
+	return protocol.ScreenCaptureRespPayload{
+		DeviceID:    deviceID,
+		ImageBase64: parts[2],
+		Width:       w,
+		Height:      h,
+		Timestamp:   time.Now().Unix(),
+	}, nil
+}
+
 func captureFallbackScreen(deviceID string, quality, maxWidth int) (protocol.ScreenCaptureRespPayload, error) {
-	// Generic fallback for non-Windows or headless unit tests
 	img := image.NewRGBA(image.Rect(0, 0, 640, 480))
 	for y := 0; y < 480; y++ {
 		for x := 0; x < 640; x++ {
-			img.Set(x, y, color.RGBA{R: 20, G: 30, B: 45, A: 255})
+			img.Set(x, y, color.RGBA{R: 15, G: 23, B: 42, A: 255})
 		}
 	}
 	var buf bytes.Buffer

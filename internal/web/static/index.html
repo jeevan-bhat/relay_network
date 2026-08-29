@@ -1754,11 +1754,29 @@
     // REMOTE SCREEN VIEWER
     // ==============================================================
 
+    let screenCaptureTimeout = null;
+
     function requestScreenCapture(quality = 75, maxWidth = 1280) {
-      if (!selectedDeviceId || !ws) return;
+      if (!selectedDeviceId || !ws) {
+        alert("Please select or pair a laptop first.");
+        return;
+      }
+      const d = devices[selectedDeviceId];
+      if (d && d.status !== 'ONLINE') {
+        alert("Cannot capture screen: Laptop is currently asleep or offline.");
+        return;
+      }
+
       document.getElementById('screenSpinner').classList.remove('hidden');
       document.getElementById('screenLiveBadge').textContent = 'CAPTURING...';
       document.getElementById('screenLiveBadge').className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-cyan-950 text-cyan-400 border border-cyan-800 animate-pulse';
+
+      if (screenCaptureTimeout) clearTimeout(screenCaptureTimeout);
+      screenCaptureTimeout = setTimeout(() => {
+        document.getElementById('screenSpinner').classList.add('hidden');
+        document.getElementById('screenLiveBadge').textContent = 'TIMEOUT';
+        document.getElementById('screenLiveBadge').className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-950 text-amber-400 border border-amber-800';
+      }, 9000);
 
       ws.send(JSON.stringify({
         type: 'SCREEN_CAPTURE_REQ',
@@ -1772,6 +1790,10 @@
     }
 
     function handleScreenCaptureResp(payload) {
+      if (screenCaptureTimeout) {
+        clearTimeout(screenCaptureTimeout);
+        screenCaptureTimeout = null;
+      }
       document.getElementById('screenSpinner').classList.add('hidden');
       if (payload.error) {
         document.getElementById('screenLiveBadge').textContent = 'ERROR';
@@ -1803,7 +1825,7 @@
         btn.className = 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 font-mono text-xs rounded-lg transition flex items-center gap-1';
         document.getElementById('screenLiveBadge').textContent = 'STANDBY';
       } else {
-        requestScreenCapture();
+        requestScreenCapture(60, 1024);
         liveStreamInterval = setInterval(() => {
           if (currentTab === 'screen' && selectedDeviceId) {
             requestScreenCapture(60, 1024);
@@ -1816,7 +1838,8 @@
 
     function downloadCurrentScreen() {
       if (!currentScreenBase64) {
-        alert("No screenshot available to download. Click Capture first.");
+        requestScreenCapture();
+        alert("Capturing screenshot now... Click Save again once image loads.");
         return;
       }
       const link = document.createElement('a');
@@ -1828,7 +1851,10 @@
     }
 
     function openFullscreenScreen() {
-      if (!currentScreenBase64) return;
+      if (!currentScreenBase64) {
+        requestScreenCapture();
+        return;
+      }
       document.getElementById('fullscreenScreenModal').classList.remove('hidden');
     }
 
