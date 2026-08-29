@@ -1295,6 +1295,16 @@
         case 'AUDIT_LOGS_LIST':
           renderAuditLogsList(env.payload);
           break;
+        case 'ERROR':
+          if (env.payload) {
+            console.warn("Relay Error:", env.payload);
+            document.getElementById('screenSpinner').classList.add('hidden');
+            if (env.payload.code === 'AGENT_OFFLINE') {
+              document.getElementById('screenLiveBadge').textContent = 'OFFLINE';
+              document.getElementById('screenLiveBadge').className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-red-950 text-red-400 border border-red-800';
+            }
+          }
+          break;
       }
     }
 
