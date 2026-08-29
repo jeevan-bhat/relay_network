@@ -169,6 +169,33 @@ CREATE TABLE IF NOT EXISTS AuditLogs (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_dev ON AuditLogs(DeviceId, Timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_time ON AuditLogs(Timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS TelemetryHistory (
+    Id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    DeviceId       TEXT NOT NULL,
+    Timestamp      INTEGER NOT NULL,
+    CPUPercent     REAL NOT NULL DEFAULT 0,
+    RAMPercent     REAL NOT NULL DEFAULT 0,
+    RAMUsedBytes   INTEGER NOT NULL DEFAULT 0,
+    RAMTotalBytes  INTEGER NOT NULL DEFAULT 0,
+    DiskUsedBytes  INTEGER NOT NULL DEFAULT 0,
+    DiskTotalBytes INTEGER NOT NULL DEFAULT 0,
+    ProcessCount   INTEGER NOT NULL DEFAULT 0,
+    PingLatencyMs  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_telemetry_dev_time ON TelemetryHistory(DeviceId, Timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS CloudFileCache (
+    DeviceId      TEXT NOT NULL,
+    Path          TEXT NOT NULL,
+    IsDir         INTEGER NOT NULL DEFAULT 0,
+    SizeBytes     INTEGER NOT NULL DEFAULT 0,
+    ContentBase64 TEXT,
+    FilesJSON     TEXT,
+    UpdatedAt     INTEGER NOT NULL,
+    PRIMARY KEY(DeviceId, Path)
+);
+CREATE INDEX IF NOT EXISTS idx_filecache_dev ON CloudFileCache(DeviceId, Path);
 `
 
 func (s *Store) migrate() error {
@@ -764,3 +791,122 @@ func (s *Store) ListAuditLogs(deviceID string, limit int) ([]protocol.AuditLogRe
 	}
 	return logs, rows.Err()
 }
+
+// RecordTelemetry records a periodic telemetry sample for a device.
+func (s *Store) RecordTelemetry(point protocol.TelemetryPoint) error {
+	if s.supabase != nil {
+		return s.supabase.RecordTelemetry(point)
+	}
+	if point.Timestamp == 0 {
+		point.Timestamp = time.Now().Unix()
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO TelemetryHistory (DeviceId, Timestamp, CPUPercent, RAMPercent, RAMUsedBytes, RAMTotalBytes, DiskUsedBytes, DiskTotalBytes, ProcessCount, PingLatencyMs)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, point.DeviceID, point.Timestamp, point.CPUPercent, point.RAMPercent, point.RAMUsedBytes, point.RAMTotalBytes, point.DiskUsedBytes, point.DiskTotalBytes, point.ProcessCount, point.PingLatencyMs)
+	return err
+}
+
+// GetTelemetryHistory returns recent telemetry points for a device, ordered chronologically.
+func (s *Store) GetTelemetryHistory(deviceID string, limit int) ([]protocol.TelemetryPoint, error) {
+	if s.supabase != nil {
+		return s.supabase.GetTelemetryHistory(deviceID, limit)
+	}
+	if limit <= 0 {
+		limit = 60
+	}
+	rows, err := s.db.Query(`
+		SELECT DeviceId, Timestamp, CPUPercent, RAMPercent, RAMUsedBytes, RAMTotalBytes, DiskUsedBytes, DiskTotalBytes, ProcessCount, PingLatencyMs
+		  FROM (
+			SELECT DeviceId, Timestamp, CPUPercent, RAMPercent, RAMUsedBytes, RAMTotalBytes, DiskUsedBytes, DiskTotalBytes, ProcessCount, PingLatencyMs
+			  FROM TelemetryHistory
+			 WHERE DeviceId = ?
+			 ORDER BY Timestamp DESC
+			 LIMIT ?
+		  ) ORDER BY Timestamp ASC
+	`, deviceID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []protocol.TelemetryPoint
+	for rows.Next() {
+		var p protocol.TelemetryPoint
+		if err := rows.Scan(&p.DeviceID, &p.Timestamp, &p.CPUPercent, &p.RAMPercent, &p.RAMUsedBytes, &p.RAMTotalBytes, &p.DiskUsedBytes, &p.DiskTotalBytes, &p.ProcessCount, &p.PingLatencyMs); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+	return points, rows.Err()
+}
+
+// CacheDirectoryListing saves directory file listings for offline browsing.
+func (s *Store) CacheDirectoryListing(deviceID, path string, files []protocol.FileInfo) error {
+	if s.supabase != nil {
+		return s.supabase.CacheDirectoryListing(deviceID, path, files)
+	}
+	bytes, _ := json.Marshal(files)
+	_, err := s.db.Exec(`
+		INSERT INTO CloudFileCache (DeviceId, Path, IsDir, SizeBytes, FilesJSON, UpdatedAt)
+		VALUES (?, ?, 1, 0, ?, ?)
+		ON CONFLICT(DeviceId, Path) DO UPDATE SET
+			FilesJSON = excluded.FilesJSON,
+			UpdatedAt = excluded.UpdatedAt
+	`, deviceID, path, string(bytes), time.Now().Unix())
+	return err
+}
+
+// GetCachedDirectoryListing retrieves cached files for offline browsing.
+func (s *Store) GetCachedDirectoryListing(deviceID, path string) ([]protocol.FileInfo, bool) {
+	if s.supabase != nil {
+		return s.supabase.GetCachedDirectoryListing(deviceID, path)
+	}
+	var filesJSON sql.NullString
+	err := s.db.QueryRow(`
+		SELECT FilesJSON FROM CloudFileCache WHERE DeviceId = ? AND Path = ? AND IsDir = 1
+	`, deviceID, path).Scan(&filesJSON)
+	if err != nil || !filesJSON.Valid || filesJSON.String == "" {
+		return nil, false
+	}
+	var files []protocol.FileInfo
+	if err := json.Unmarshal([]byte(filesJSON.String), &files); err != nil {
+		return nil, false
+	}
+	return files, true
+}
+
+// CacheFileContent stores a snapshot of a file's base64 content in cloud storage.
+func (s *Store) CacheFileContent(deviceID, path, contentBase64 string, sizeBytes int64) error {
+	if s.supabase != nil {
+		return s.supabase.CacheFileContent(deviceID, path, contentBase64, sizeBytes)
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO CloudFileCache (DeviceId, Path, IsDir, SizeBytes, ContentBase64, UpdatedAt)
+		VALUES (?, ?, 0, ?, ?, ?)
+		ON CONFLICT(DeviceId, Path) DO UPDATE SET
+			SizeBytes = excluded.SizeBytes,
+			ContentBase64 = excluded.ContentBase64,
+			UpdatedAt = excluded.UpdatedAt
+	`, deviceID, path, sizeBytes, contentBase64, time.Now().Unix())
+	return err
+}
+
+// GetCachedFileContent returns a cached file's content and size.
+func (s *Store) GetCachedFileContent(deviceID, path string) (string, int64, bool) {
+	if s.supabase != nil {
+		return s.supabase.GetCachedFileContent(deviceID, path)
+	}
+	var (
+		content sql.NullString
+		size    int64
+	)
+	err := s.db.QueryRow(`
+		SELECT ContentBase64, SizeBytes FROM CloudFileCache WHERE DeviceId = ? AND Path = ? AND IsDir = 0
+	`, deviceID, path).Scan(&content, &size)
+	if err != nil || !content.Valid {
+		return "", 0, false
+	}
+	return content.String, size, true
+}
+

@@ -19,6 +19,7 @@ import (
 	"terminalagent/internal/health"
 	"terminalagent/internal/processmgr"
 	"terminalagent/internal/protocol"
+	"terminalagent/internal/screen"
 	"terminalagent/internal/store"
 
 	"github.com/gorilla/websocket"
@@ -339,6 +340,22 @@ func (c *Client) handleIncoming(env protocol.Envelope) {
 			resp.Error = err.Error()
 		}
 		respEnv, _ := protocol.NewEnvelope(protocol.TypeProcessKillResp, c.cfg.DeviceID, resp)
+		respEnv.ID = env.ID
+		c.Send(respEnv)
+
+	case protocol.TypeScreenCaptureReq:
+		var req protocol.ScreenCaptureReqPayload
+		_ = env.DecodePayload(&req)
+		quality := req.Quality
+		if quality <= 0 {
+			quality = 75
+		}
+		maxWidth := req.MaxWidth
+		if maxWidth <= 0 {
+			maxWidth = 1280
+		}
+		resp, _ := screen.CaptureScreen(c.cfg.DeviceID, quality, maxWidth)
+		respEnv, _ := protocol.NewEnvelope(protocol.TypeScreenCaptureResp, c.cfg.DeviceID, resp)
 		respEnv.ID = env.ID
 		c.Send(respEnv)
 

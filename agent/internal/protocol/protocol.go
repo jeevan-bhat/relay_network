@@ -46,6 +46,10 @@ const (
 	TypeAuditLog        = "AUDIT_LOG"
 	TypeGetAuditLogs    = "GET_AUDIT_LOGS"
 	TypeAuditLogsList   = "AUDIT_LOGS_LIST"
+
+	// Screen Capture
+	TypeScreenCaptureReq  = "SCREEN_CAPTURE_REQ"
+	TypeScreenCaptureResp = "SCREEN_CAPTURE_RESP"
 )
 
 // Roles for authenticated connections.
@@ -333,4 +337,45 @@ type AuditLogRecord struct {
 // AuditLogsListPayload returns historical audit logs.
 type AuditLogsListPayload struct {
 	Logs []AuditLogRecord `json:"logs"`
+}
+
+// --- Screen Capture Payloads ---
+
+// ScreenCaptureReqPayload requests a desktop screenshot.
+type ScreenCaptureReqPayload struct {
+	DeviceID string `json:"deviceId"`
+	Quality  int    `json:"quality,omitempty"`  // 1-100 (default: 75)
+	MaxWidth int    `json:"maxWidth,omitempty"` // max width scaling (default: 1280)
+}
+
+// ScreenCaptureRespPayload returns a captured desktop screenshot.
+type ScreenCaptureRespPayload struct {
+	DeviceID    string `json:"deviceId"`
+	ImageBase64 string `json:"imageBase64"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+	Timestamp   int64  `json:"timestamp"`
+	Error       string `json:"error,omitempty"`
+}
+
+// --- Historical Telemetry Payloads ---
+
+// TelemetryPoint represents a single historical telemetry point.
+type TelemetryPoint struct {
+	DeviceID       string  `json:"deviceId"`
+	Timestamp      int64   `json:"timestamp"`
+	CPUPercent     float64 `json:"cpuPercent"`
+	RAMPercent     float64 `json:"ramPercent"`
+	RAMUsedBytes   uint64  `json:"ramUsedBytes"`
+	RAMTotalBytes  uint64  `json:"ramTotalBytes"`
+	DiskUsedBytes  uint64  `json:"diskUsedBytes"`
+	DiskTotalBytes uint64  `json:"diskTotalBytes"`
+	ProcessCount   int     `json:"processCount"`
+	PingLatencyMs  int64   `json:"pingLatencyMs,omitempty"`
+}
+
+// TelemetryHistoryResponse returns historical time-series telemetry.
+type TelemetryHistoryResponse struct {
+	DeviceID string           `json:"deviceId"`
+	Points   []TelemetryPoint `json:"points"`
 }

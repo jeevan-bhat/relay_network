@@ -597,3 +597,130 @@ func (s *SupabaseStore) ListAuditLogs(deviceID string, limit int) ([]protocol.Au
 	}
 	return result, nil
 }
+
+// Telemetry & File Cache in Supabase
+
+func (s *SupabaseStore) RecordTelemetry(point protocol.TelemetryPoint) error {
+	payload := map[string]any{
+		"device_id":        point.DeviceID,
+		"timestamp":        point.Timestamp,
+		"cpu_percent":      point.CPUPercent,
+		"ram_percent":      point.RAMPercent,
+		"ram_used_bytes":   point.RAMUsedBytes,
+		"ram_total_bytes":  point.RAMTotalBytes,
+		"disk_used_bytes":  point.DiskUsedBytes,
+		"disk_total_bytes": point.DiskTotalBytes,
+		"process_count":    point.ProcessCount,
+		"ping_latency_ms":  point.PingLatencyMs,
+	}
+	_, _, err := s.req("POST", "/telemetry_history", payload, map[string]string{
+		"Prefer": "resolution=merge-duplicates",
+	})
+	return err
+}
+
+func (s *SupabaseStore) GetTelemetryHistory(deviceID string, limit int) ([]protocol.TelemetryPoint, error) {
+	if limit <= 0 {
+		limit = 60
+	}
+	endpoint := fmt.Sprintf("/telemetry_history?device_id=eq.%s&order=timestamp.desc&limit=%d", url.QueryEscape(deviceID), limit)
+	resBytes, code, err := s.req("GET", endpoint, nil, nil)
+	if err != nil || code >= 300 {
+		return nil, err
+	}
+	var list []struct {
+		DeviceID       string  `json:"device_id"`
+		Timestamp      int64   `json:"timestamp"`
+		CPUPercent     float64 `json:"cpu_percent"`
+		RAMPercent     float64 `json:"ram_percent"`
+		RAMUsedBytes   uint64  `json:"ram_used_bytes"`
+		RAMTotalBytes  uint64  `json:"ram_total_bytes"`
+		DiskUsedBytes  uint64  `json:"disk_used_bytes"`
+		DiskTotalBytes uint64  `json:"disk_total_bytes"`
+		ProcessCount   int     `json:"process_count"`
+		PingLatencyMs  int64   `json:"ping_latency_ms"`
+	}
+	_ = json.Unmarshal(resBytes, &list)
+	var points []protocol.TelemetryPoint
+	for i := len(list) - 1; i >= 0; i-- {
+		p := list[i]
+		points = append(points, protocol.TelemetryPoint{
+			DeviceID:       p.DeviceID,
+			Timestamp:      p.Timestamp,
+			CPUPercent:     p.CPUPercent,
+			RAMPercent:     p.RAMPercent,
+			RAMUsedBytes:   p.RAMUsedBytes,
+			RAMTotalBytes:  p.RAMTotalBytes,
+			DiskUsedBytes:  p.DiskUsedBytes,
+			DiskTotalBytes: p.DiskTotalBytes,
+			ProcessCount:   p.ProcessCount,
+			PingLatencyMs:  p.PingLatencyMs,
+		})
+	}
+	return points, nil
+}
+
+func (s *SupabaseStore) CacheDirectoryListing(deviceID, path string, files []protocol.FileInfo) error {
+	bytes, _ := json.Marshal(files)
+	payload := map[string]any{
+		"device_id":  deviceID,
+		"path":       path,
+		"is_dir":     1,
+		"files_json": string(bytes),
+		"updated_at": time.Now().Unix(),
+	}
+	_, _, err := s.req("POST", "/cloud_file_cache", payload, map[string]string{
+		"Prefer": "resolution=merge-duplicates",
+	})
+	return err
+}
+
+func (s *SupabaseStore) GetCachedDirectoryListing(deviceID, path string) ([]protocol.FileInfo, bool) {
+	endpoint := fmt.Sprintf("/cloud_file_cache?device_id=eq.%s&path=eq.%s&is_dir=eq.1&limit=1", url.QueryEscape(deviceID), url.QueryEscape(path))
+	resBytes, code, err := s.req("GET", endpoint, nil, nil)
+	if err != nil || code >= 300 {
+		return nil, false
+	}
+	var list []struct {
+		FilesJSON string `json:"files_json"`
+	}
+	if err := json.Unmarshal(resBytes, &list); err != nil || len(list) == 0 || list[0].FilesJSON == "" {
+		return nil, false
+	}
+	var files []protocol.FileInfo
+	if err := json.Unmarshal([]byte(list[0].FilesJSON), &files); err != nil {
+		return nil, false
+	}
+	return files, true
+}
+
+func (s *SupabaseStore) CacheFileContent(deviceID, path, contentBase64 string, sizeBytes int64) error {
+	payload := map[string]any{
+		"device_id":      deviceID,
+		"path":           path,
+		"is_dir":         0,
+		"size_bytes":     sizeBytes,
+		"content_base64": contentBase64,
+		"updated_at":     time.Now().Unix(),
+	}
+	_, _, err := s.req("POST", "/cloud_file_cache", payload, map[string]string{
+		"Prefer": "resolution=merge-duplicates",
+	})
+	return err
+}
+
+func (s *SupabaseStore) GetCachedFileContent(deviceID, path string) (string, int64, bool) {
+	endpoint := fmt.Sprintf("/cloud_file_cache?device_id=eq.%s&path=eq.%s&is_dir=eq.0&limit=1", url.QueryEscape(deviceID), url.QueryEscape(path))
+	resBytes, code, err := s.req("GET", endpoint, nil, nil)
+	if err != nil || code >= 300 {
+		return "", 0, false
+	}
+	var list []struct {
+		ContentBase64 string `json:"content_base64"`
+		SizeBytes     int64  `json:"size_bytes"`
+	}
+	if err := json.Unmarshal(resBytes, &list); err != nil || len(list) == 0 {
+		return "", 0, false
+	}
+	return list[0].ContentBase64, list[0].SizeBytes, true
+}

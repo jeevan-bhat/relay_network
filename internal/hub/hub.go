@@ -217,10 +217,10 @@ func (h *Hub) handleMessage(c *Client, env protocol.Envelope) {
 	case protocol.TypeGetAuditLogs:
 		h.handleGetAuditLogs(c, env)
 	case protocol.TypeFileListReq, protocol.TypeFileReadReq, protocol.TypeFileWriteReq, protocol.TypeFileDeleteReq,
-		protocol.TypeProcessListReq, protocol.TypeProcessKillReq:
+		protocol.TypeProcessListReq, protocol.TypeProcessKillReq, protocol.TypeScreenCaptureReq:
 		h.routeToAgent(c, env)
 	case protocol.TypeFileListResp, protocol.TypeFileReadResp, protocol.TypeFileWriteResp, protocol.TypeFileDeleteResp,
-		protocol.TypeProcessListResp, protocol.TypeProcessKillResp:
+		protocol.TypeProcessListResp, protocol.TypeProcessKillResp, protocol.TypeScreenCaptureResp:
 		h.routeToControllers(c, env)
 	default:
 		h.log.Warn("unknown message type", "type", env.Type)
@@ -323,6 +323,19 @@ func (h *Hub) handleHeartbeat(c *Client, env protocol.Envelope) {
 	}
 
 	_ = h.store.UpdateDeviceHeartbeat(p.DeviceID, p.Metrics, protocol.StatusOnline)
+
+	// Record historical telemetry sample for charts
+	_ = h.store.RecordTelemetry(protocol.TelemetryPoint{
+		DeviceID:       p.DeviceID,
+		Timestamp:      time.Now().Unix(),
+		CPUPercent:     p.Metrics.CPUPercent,
+		RAMPercent:     p.Metrics.RAMPercent,
+		RAMUsedBytes:   p.Metrics.RAMUsedBytes,
+		RAMTotalBytes:  p.Metrics.RAMTotalBytes,
+		DiskUsedBytes:  p.Metrics.DiskUsedBytes,
+		DiskTotalBytes: p.Metrics.DiskTotalBytes,
+		ProcessCount:   p.Metrics.ProcessCount,
+	})
 
 	ack, _ := protocol.NewEnvelope(protocol.TypeHeartbeatAck, p.DeviceID, protocol.HeartbeatAckPayload{
 		DeviceID:   p.DeviceID,
@@ -739,6 +752,34 @@ func (h *Hub) routeToAgent(c *Client, env protocol.Envelope) {
 
 	agent, ok := h.getAgentClient(env.DeviceID)
 	if !ok || agent == nil {
+		// If agent is offline, check if request can be served from Cloud File Cache
+		if env.Type == protocol.TypeFileListReq {
+			var p protocol.FileListReqPayload
+			_ = env.DecodePayload(&p)
+			if cachedFiles, found := h.store.GetCachedDirectoryListing(env.DeviceID, p.Path); found {
+				respEnv, _ := protocol.NewEnvelope(protocol.TypeFileListResp, env.DeviceID, protocol.FileListRespPayload{
+					DeviceID: env.DeviceID,
+					Path:     p.Path,
+					Files:    cachedFiles,
+				})
+				c.Send(respEnv)
+				return
+			}
+		} else if env.Type == protocol.TypeFileReadReq {
+			var p protocol.FileReadReqPayload
+			_ = env.DecodePayload(&p)
+			if content, size, found := h.store.GetCachedFileContent(env.DeviceID, p.Path); found {
+				respEnv, _ := protocol.NewEnvelope(protocol.TypeFileReadResp, env.DeviceID, protocol.FileReadRespPayload{
+					DeviceID:      env.DeviceID,
+					Path:          p.Path,
+					ContentBase64: content,
+					SizeBytes:     size,
+				})
+				c.Send(respEnv)
+				return
+			}
+		}
+
 		h.sendError(c, "AGENT_OFFLINE", fmt.Sprintf("device %s is offline", env.DeviceID))
 		return
 	}
@@ -747,8 +788,18 @@ func (h *Hub) routeToAgent(c *Client, env protocol.Envelope) {
 }
 
 func (h *Hub) routeToControllers(c *Client, env protocol.Envelope) {
-	// Record audit logs for file/process actions
+	// Auto-cache file tree and contents when live agent responds
 	switch env.Type {
+	case protocol.TypeFileListResp:
+		var p protocol.FileListRespPayload
+		if err := env.DecodePayload(&p); err == nil && len(p.Files) > 0 {
+			_ = h.store.CacheDirectoryListing(p.DeviceID, p.Path, p.Files)
+		}
+	case protocol.TypeFileReadResp:
+		var p protocol.FileReadRespPayload
+		if err := env.DecodePayload(&p); err == nil && p.ContentBase64 != "" {
+			_ = h.store.CacheFileContent(p.DeviceID, p.Path, p.ContentBase64, p.SizeBytes)
+		}
 	case protocol.TypeFileWriteResp:
 		var p protocol.FileWriteRespPayload
 		_ = env.DecodePayload(&p)

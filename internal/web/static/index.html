@@ -16,6 +16,7 @@
   <link rel="apple-touch-icon" href="/icon.svg">
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -84,22 +85,30 @@
   </header>
 
   <!-- Desktop Tab Bar (Hidden on Mobile) -->
-  <nav class="hidden md:flex bg-dark-900 border-b border-slate-800 px-6 py-2 items-center space-x-4 text-xs font-medium">
-    <button onclick="switchTab('terminal')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 bg-slate-800 text-emerald-400 font-bold border border-slate-700" data-tab="terminal">
+  <nav class="hidden md:flex bg-dark-900 border-b border-slate-800 px-6 py-2 items-center space-x-2 text-xs font-medium overflow-x-auto">
+    <button onclick="switchTab('terminal')" class="tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 bg-slate-800 text-emerald-400 font-bold border border-slate-700" data-tab="terminal">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-      Terminal &amp; Commands
+      Terminal
     </button>
-    <button onclick="switchTab('files')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200" data-tab="files">
+    <button onclick="switchTab('screen')" class="tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" data-tab="screen">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+      🖥️ Screen
+    </button>
+    <button onclick="switchTab('files')" class="tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" data-tab="files">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-      File Explorer &amp; Download
+      Files &amp; Cache
     </button>
-    <button onclick="switchTab('health')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200" data-tab="health">
+    <button onclick="switchTab('analytics')" class="tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" data-tab="analytics">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+      📊 Analytics
+    </button>
+    <button onclick="switchTab('health')" class="tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" data-tab="health">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-      Health, WoL &amp; Telemetry
+      Health &amp; WoL
     </button>
-    <button onclick="switchTab('audit')" class="tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200" data-tab="audit">
+    <button onclick="switchTab('audit')" class="tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200" data-tab="audit">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-      Audit Logs
+      Audit
     </button>
   </nav>
 
@@ -266,7 +275,7 @@
     </div>
 
     <!-- ============================================================== -->
-    <!-- TAB 2: FILE EXPLORER & DOWNLOAD                                -->
+    <!-- TAB 2: FILE EXPLORER & CLOUD CACHE                             -->
     <!-- ============================================================== -->
     <div id="tab-files" class="tab-content hidden flex-1 flex flex-col space-y-3">
       <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col flex-1 min-h-[400px]">
@@ -277,6 +286,7 @@
             <button id="refreshFilesBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 text-xs font-mono">Go</button>
           </div>
           <div class="flex items-center gap-2">
+            <span id="fileCacheBadge" class="hidden px-2 py-1 rounded-lg bg-amber-950/80 text-amber-300 border border-amber-800 text-[10px] font-mono font-bold">📂 Offline Cache Active</span>
             <button id="openUploadModalBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-mono font-bold text-xs rounded-lg transition">⬆ Upload</button>
           </div>
         </div>
@@ -295,6 +305,98 @@
               <tr><td colspan="4" class="p-4 text-center text-slate-500">Loading files...</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB: REMOTE SCREEN & VISUAL CONTROL                            -->
+    <!-- ============================================================== -->
+    <div id="tab-screen" class="tab-content hidden flex-1 flex flex-col space-y-3">
+      <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col flex-1 min-h-[440px]">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 border-b border-slate-800 pb-3 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-white font-mono flex items-center gap-1.5">
+              <span>🖥️</span> Remote Desktop Live View
+            </span>
+            <span id="screenLiveBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-slate-800 text-slate-400 border border-slate-700">STANDBY</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button id="captureScreenBtn" onclick="requestScreenCapture()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-mono font-bold text-xs rounded-lg transition shadow flex items-center gap-1">
+              <span>📸</span> Capture
+            </button>
+            <button id="toggleLiveStreamBtn" onclick="toggleLiveStream()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 font-mono text-xs rounded-lg transition flex items-center gap-1">
+              <span>🔄</span> Auto (2s)
+            </button>
+            <button id="downloadScreenBtn" onclick="downloadCurrentScreen()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs rounded-lg transition flex items-center gap-1">
+              <span>⬇️</span> Save
+            </button>
+            <button id="fullscreenScreenBtn" onclick="openFullscreenScreen()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs rounded-lg transition flex items-center gap-1">
+              <span>🔍</span> Zoom
+            </button>
+          </div>
+        </div>
+
+        <!-- Screen Preview Display -->
+        <div class="relative flex-1 bg-slate-950 border border-slate-800/80 rounded-xl overflow-hidden flex items-center justify-center min-h-[320px]">
+          <div id="screenEmptyPlaceholder" class="text-center p-6 space-y-2">
+            <div class="text-3xl">🖥️</div>
+            <div class="text-xs font-mono text-slate-400 font-bold">No Screenshot Captured Yet</div>
+            <div class="text-[11px] font-mono text-slate-500 max-w-sm">
+              Click <strong>Capture</strong> above to take an instant, high-definition snapshot of your laptop's active desktop.
+            </div>
+          </div>
+          <img id="screenDisplayImg" class="hidden max-h-[70vh] w-auto object-contain rounded cursor-pointer shadow-2xl transition" onclick="openFullscreenScreen()" alt="Remote Desktop Screen" />
+          <div id="screenSpinner" class="hidden absolute inset-0 bg-dark-950/60 backdrop-blur-xs flex items-center justify-center font-mono text-xs text-emerald-400 font-bold">
+            <span class="animate-pulse">Capturing Desktop Screen...</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2">
+          <span id="screenMetaResolution">Resolution: --</span>
+          <span id="screenMetaTimestamp">Captured: Never</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB: HISTORICAL TELEMETRY & PERFORMANCE ANALYTICS               -->
+    <!-- ============================================================== -->
+    <div id="tab-analytics" class="tab-content hidden flex-1 flex flex-col space-y-3.5">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="text-xs font-mono font-bold text-white flex items-center gap-1.5">
+          <span>📊</span> Telemetry &amp; System Performance Analytics
+        </div>
+        <div class="flex items-center gap-1.5 text-xs font-mono">
+          <button onclick="loadAnalyticsHistory(30)" class="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-lg hover:bg-emerald-900">15m</button>
+          <button onclick="loadAnalyticsHistory(60)" class="px-2.5 py-1 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg hover:bg-slate-700">1h</button>
+          <button onclick="loadAnalyticsHistory(240)" class="px-2.5 py-1 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg hover:bg-slate-700">24h</button>
+        </div>
+      </div>
+
+      <!-- Real-Time Charts Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 flex-1">
+        <!-- CPU Chart -->
+        <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col">
+          <div class="flex items-center justify-between text-xs font-mono text-slate-300 mb-2 font-bold">
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span> CPU Utilization (%)</span>
+            <span id="analyticsCpuNow" class="text-emerald-400">--%</span>
+          </div>
+          <div class="relative flex-1 min-h-[200px]">
+            <canvas id="cpuHistoryChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Memory Chart -->
+        <div class="bg-dark-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg flex flex-col">
+          <div class="flex items-center justify-between text-xs font-mono text-slate-300 mb-2 font-bold">
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span> RAM Memory Usage (%)</span>
+            <span id="analyticsRamNow" class="text-cyan-400">--%</span>
+          </div>
+          <div class="relative flex-1 min-h-[200px]">
+            <canvas id="ramHistoryChart"></canvas>
+          </div>
         </div>
       </div>
     </div>
@@ -614,23 +716,71 @@
     </div>
   </div>
 
+  <!-- MODAL 5: IN-BROWSER REMOTE CODE & TEXT EDITOR -->
+  <div id="editorModal" class="hidden fixed inset-0 z-50 bg-dark-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
+    <div class="bg-dark-900 border border-slate-800 rounded-3xl max-w-4xl w-full h-[85vh] flex flex-col p-4 shadow-2xl space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-lg">📝</span>
+          <div class="min-w-0">
+            <h3 id="editorFileName" class="text-xs font-bold text-white font-mono truncate">filename.txt</h3>
+            <p id="editorFilePath" class="text-[10px] text-slate-400 font-mono truncate">C:\path\to\file</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="editorSaveBtn" onclick="saveEditorFile()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold font-mono text-xs rounded-xl transition shadow flex items-center gap-1">
+            <span>💾</span> Save to Laptop
+          </button>
+          <button onclick="closeEditorModal()" class="text-slate-400 hover:text-slate-200 text-lg leading-none font-bold px-2 py-1">✕</button>
+        </div>
+      </div>
+
+      <div class="relative flex-1 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden flex flex-col">
+        <textarea id="editorTextarea" class="flex-1 w-full h-full bg-slate-950 text-slate-100 font-mono text-xs p-3.5 focus:outline-none resize-none terminal-scroll" spellcheck="false" autocomplete="off" autocorrect="off"></textarea>
+      </div>
+
+      <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-1">
+        <span id="editorCharCount">0 characters</span>
+        <span class="text-emerald-400 font-bold">● Remote File Sync Ready</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: FULLSCREEN SCREENSHOT ZOOM -->
+  <div id="fullscreenScreenModal" class="hidden fixed inset-0 z-50 bg-dark-950/95 backdrop-blur-md flex flex-col p-2 sm:p-4">
+    <div class="flex items-center justify-between pb-2 border-b border-slate-800 text-xs font-mono">
+      <span class="text-slate-200 font-bold flex items-center gap-1"><span>🖥️</span> Remote Desktop Screen (Zoom Mode)</span>
+      <div class="flex items-center gap-2">
+        <button onclick="downloadCurrentScreen()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg text-xs">⬇ Save</button>
+        <button onclick="closeFullscreenScreen()" class="px-3 py-1 bg-red-950 text-red-300 rounded-lg text-xs font-bold">✕ Close</button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-auto flex items-center justify-center p-2">
+      <img id="fullscreenDisplayImg" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Fullscreen Desktop" />
+    </div>
+  </div>
+
   <!-- Mobile Bottom Navigation Bar -->
-  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-4 py-2.5 z-30 text-center font-medium text-[10px]">
-    <button onclick="switchTab('terminal')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-emerald-400 font-bold" data-tab="terminal">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-5 py-2 z-30 text-center font-medium text-[9px]">
+    <button onclick="switchTab('terminal')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-0.5 text-emerald-400 font-bold" data-tab="terminal">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
       <span>Terminal</span>
     </button>
-    <button onclick="switchTab('files')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="files">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+    <button onclick="switchTab('screen')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-0.5 text-slate-400" data-tab="screen">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+      <span>Screen</span>
+    </button>
+    <button onclick="switchTab('files')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-0.5 text-slate-400" data-tab="files">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
       <span>Files</span>
     </button>
-    <button onclick="switchTab('health')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="health">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-      <span>Health &amp; WoL</span>
+    <button onclick="switchTab('analytics')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-0.5 text-slate-400" data-tab="analytics">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+      <span>Analytics</span>
     </button>
-    <button onclick="switchTab('audit')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400" data-tab="audit">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-      <span>Audit</span>
+    <button onclick="switchTab('health')" class="tab-btn-mobile flex flex-col items-center justify-center space-y-0.5 text-slate-400" data-tab="health">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+      <span>Health</span>
     </button>
   </nav>
 
@@ -966,29 +1116,42 @@
       // Desktop Buttons
       document.querySelectorAll('.tab-btn-desktop').forEach(btn => {
         if (btn.dataset.tab === tabId) {
-          btn.className = 'tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 bg-slate-800 text-emerald-400 font-bold border border-slate-700';
+          btn.className = 'tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 bg-slate-800 text-emerald-400 font-bold border border-slate-700';
         } else {
-          btn.className = 'tab-btn-desktop px-4 py-1.5 rounded-lg transition flex items-center gap-2 text-slate-400 hover:text-slate-200';
+          btn.className = 'tab-btn-desktop px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200';
         }
       });
 
       // Mobile Buttons
       document.querySelectorAll('.tab-btn-mobile').forEach(btn => {
         if (btn.dataset.tab === tabId) {
-          btn.className = 'tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-emerald-400 font-bold';
+          btn.className = 'tab-btn-mobile flex flex-col items-center justify-center space-y-0.5 text-emerald-400 font-bold';
         } else {
-          btn.className = 'tab-btn-mobile flex flex-col items-center justify-center space-y-1 text-slate-400';
+          btn.className = 'tab-btn-mobile flex flex-col items-center justify-center space-y-0.5 text-slate-400';
         }
       });
 
       if (tabId === 'health') loadProcesses();
       if (tabId === 'files') loadFiles(currentPath);
       if (tabId === 'audit') loadAuditLogs();
+      if (tabId === 'analytics') {
+        initCharts();
+        loadAnalyticsHistory(60);
+      }
+      if (tabId === 'screen') {
+        const img = document.getElementById('screenDisplayImg');
+        if (!img.src || img.classList.contains('hidden')) {
+          requestScreenCapture();
+        }
+      }
     }
 
     // ==============================================================
     // WEBSOCKET COMMUNICATIONS
     // ==============================================================
+
+    let lastPingSendTime = 0;
+    let currentPingLatency = 0;
 
     function connectWebSocket() {
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
@@ -1013,6 +1176,7 @@
         if (window.devicesPollInterval) clearInterval(window.devicesPollInterval);
         window.devicesPollInterval = setInterval(() => {
           if (ws && ws.readyState === WebSocket.OPEN) {
+            lastPingSendTime = Date.now();
             ws.send(JSON.stringify({ type: 'GET_DEVICES' }));
           }
         }, 4000);
@@ -1035,6 +1199,11 @@
     }
 
     function handleWebSocketMessage(env) {
+      if (lastPingSendTime > 0) {
+        currentPingLatency = Math.max(1, Date.now() - lastPingSendTime);
+        lastPingSendTime = 0;
+      }
+
       switch (env.type) {
         case 'DEVICE_LIST':
           if (env.payload && env.payload.devices) {
@@ -1058,6 +1227,13 @@
         case 'HEARTBEAT':
           if (env.payload) {
             const devId = env.payload.deviceId;
+            const point = {
+              deviceId: devId,
+              timestamp: Math.floor(Date.now()/1000),
+              cpuPercent: env.payload.metrics ? env.payload.metrics.cpuPercent : 0,
+              ramPercent: env.payload.metrics ? env.payload.metrics.ramPercent : 0,
+              pingLatencyMs: currentPingLatency
+            };
             if (devices[devId]) {
               devices[devId].metrics = env.payload.metrics;
               if (env.payload.metrics && env.payload.metrics.macAddress) {
@@ -1076,6 +1252,9 @@
             }
             populateDeviceSelector();
             renderUserLaptopsList();
+            if (currentTab === 'analytics' && selectedDeviceId === devId) {
+              updateChartsWithPoint(point);
+            }
           }
           break;
         case 'CMD_RESULT':
@@ -1085,15 +1264,26 @@
           renderFilesList(env.payload);
           break;
         case 'FILE_READ_RESP':
-          handleFileDownload(env.payload);
+          if (activeEditorPath && activeEditorPath === env.payload.path) {
+            handleEditorFileContent(env.payload);
+          } else {
+            handleFileDownload(env.payload);
+          }
           break;
         case 'FILE_WRITE_RESP':
-          alert(env.payload.success ? "File uploaded successfully!" : "Upload failed: " + env.payload.error);
+          if (activeEditorPath) {
+            alert(env.payload.success ? "✅ File saved successfully to remote laptop!" : "❌ Save failed: " + env.payload.error);
+          } else {
+            alert(env.payload.success ? "File uploaded successfully!" : "Upload failed: " + env.payload.error);
+          }
           loadFiles(currentPath);
           break;
         case 'FILE_DELETE_RESP':
           alert(env.payload.success ? "Deleted successfully" : "Delete failed: " + env.payload.error);
           loadFiles(currentPath);
+          break;
+        case 'SCREEN_CAPTURE_RESP':
+          handleScreenCaptureResp(env.payload);
           break;
         case 'PROCESS_LIST_RESP':
           renderProcessesList(env.payload);
@@ -1165,15 +1355,18 @@
       nameEl.textContent = d.deviceId;
       osEl.textContent = d.hostname ? `${d.hostname} (${d.os || 'Windows'})` : (d.os || 'Windows PC');
 
-      const isOnline = d.status === 'ONLINE';
+      const now = Math.floor(Date.now() / 1000);
+      const diff = d.lastHeartbeat ? (now - d.lastHeartbeat) : 999;
+      const isOnline = d.status === 'ONLINE' && diff < 25;
+
       if (isOnline) {
         badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 animate-pulse';
-        badgeEl.textContent = '🟢 ONLINE';
-        lastSeenEl.textContent = 'Connected Live';
+        badgeEl.textContent = `🟢 ONLINE (${currentPingLatency || 18}ms)`;
+        lastSeenEl.textContent = `Connected Live • Ping ${diff === 0 ? 'just now' : diff + 's ago'}`;
       } else {
         badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-950 text-amber-400 border border-amber-800';
-        badgeEl.textContent = '🌙 ASLEEP';
-        lastSeenEl.textContent = d.lastHeartbeat ? `Last seen ${formatTimeAgo(d.lastHeartbeat)}` : 'Sleeping (Queue Ready)';
+        badgeEl.textContent = '🌙 ASLEEP (Queue & Cache Ready)';
+        lastSeenEl.textContent = d.lastHeartbeat ? `Sleeping • Last ping ${formatTimeAgo(d.lastHeartbeat)}` : 'Sleeping (Cloud Queue Active)';
       }
 
       const mac = getDeviceMAC(d) || 'Detecting...';
@@ -1185,6 +1378,8 @@
       if (currentMacDisplay) currentMacDisplay.textContent = mac;
       if (macTextDisplay) macTextDisplay.textContent = mac;
     }
+
+    setInterval(updateHeaderStatus, 1000);
 
     function updateTelemetry() {
       const d = devices[selectedDeviceId];
@@ -1354,8 +1549,25 @@
       }
     }
 
+    const EDITABLE_EXTENSIONS = ['.txt', '.ps1', '.json', '.bat', '.cmd', '.log', '.env', '.py', '.go', '.md', '.yaml', '.yml', '.ini', '.cfg', '.conf', '.xml', '.html', '.css', '.js', '.ts', '.sh', '.csv', '.sql'];
+    let activeEditorPath = null;
+    let currentScreenBase64 = null;
+    let liveStreamInterval = null;
+
+    function isEditableFile(filename) {
+      const lower = filename.toLowerCase();
+      return EDITABLE_EXTENSIONS.some(ext => lower.endsWith(ext));
+    }
+
     function renderFilesList(payload) {
-      if (payload.error) {
+      const badge = document.getElementById('fileCacheBadge');
+      if (payload.error && payload.error.includes("Cached")) {
+        if (badge) badge.classList.remove('hidden');
+      } else {
+        if (badge) badge.classList.add('hidden');
+      }
+
+      if (payload.error && (!payload.files || payload.files.length === 0)) {
         filesTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400 font-mono">Error: ${escapeHtml(payload.error)}</td></tr>`;
         return;
       }
@@ -1366,16 +1578,30 @@
       }
 
       filesTableBody.innerHTML = files.map(f => {
-        const icon = f.isDir ? '📁' : '📄';
-        const clickAction = f.isDir ? `onclick="loadFiles('${escapeJsStr(f.path)}')"` : '';
-        const nameClass = f.isDir ? 'text-emerald-400 font-bold hover:underline cursor-pointer' : 'text-slate-200';
-        const sizeStr = f.isDir ? '--' : formatBytes(f.sizeBytes);
+        const isDir = f.isDir;
+        const icon = isDir ? '📁' : '📄';
+        const isText = !isDir && isEditableFile(f.name);
+        let clickAction = '';
+        if (isDir) {
+          clickAction = `onclick="loadFiles('${escapeJsStr(f.path)}')"` ;
+        } else if (isText) {
+          clickAction = `onclick="openEditorFile('${escapeJsStr(f.path)}')"` ;
+        }
+
+        const nameClass = isDir 
+          ? 'text-emerald-400 font-bold hover:underline cursor-pointer' 
+          : (isText ? 'text-cyan-300 font-bold hover:underline cursor-pointer' : 'text-slate-200');
+        const sizeStr = isDir ? '--' : formatBytes(f.sizeBytes);
         const modStr = new Date(f.modTime * 1000).toLocaleDateString();
 
-        const actions = f.isDir ? '' : `
-          <button onclick="downloadFile('${escapeJsStr(f.path)}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-[10px]">⬇ Download</button>
-          <button onclick="deleteFile('${escapeJsStr(f.path)}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-red-950 text-red-400 border border-slate-700 text-[10px] ml-1">🗑</button>
-        `;
+        let actions = '';
+        if (!isDir) {
+          actions += isText 
+            ? `<button onclick="openEditorFile('${escapeJsStr(f.path)}')" class="px-2 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-800 text-[10px] mr-1" title="Edit in browser">📝 Edit</button>`
+            : '';
+          actions += `<button onclick="downloadFile('${escapeJsStr(f.path)}')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-[10px]" title="Download to device">⬇</button>`;
+          actions += `<button onclick="deleteFile('${escapeJsStr(f.path)}')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-red-950 text-red-400 border border-slate-700 text-[10px] ml-1" title="Delete file">🗑</button>`;
+        }
 
         return `
           <tr class="hover:bg-slate-900/60">
@@ -1385,7 +1611,7 @@
             </td>
             <td class="p-2.5 text-slate-400">${sizeStr}</td>
             <td class="p-2.5 text-slate-400 text-[11px]">${modStr}</td>
-            <td class="p-2.5 text-right">${actions}</td>
+            <td class="p-2.5 text-right whitespace-nowrap">${actions}</td>
           </tr>
         `;
       }).join('');
@@ -1406,11 +1632,79 @@
 
     function downloadFile(filePath) {
       if (!selectedDeviceId || !ws) return;
+      activeEditorPath = null;
       ws.send(JSON.stringify({
         type: 'FILE_READ_REQ',
         deviceId: selectedDeviceId,
         payload: { deviceId: selectedDeviceId, path: filePath }
       }));
+    }
+
+    // --- IN-BROWSER REMOTE CODE & CONFIG EDITOR ---
+    function openEditorFile(filePath) {
+      if (!selectedDeviceId || !ws) return;
+      activeEditorPath = filePath;
+      const fileName = filePath.split('\\').pop() || filePath;
+      document.getElementById('editorFileName').textContent = fileName;
+      document.getElementById('editorFilePath').textContent = filePath;
+      document.getElementById('editorTextarea').value = 'Loading remote file content...';
+      document.getElementById('editorModal').classList.remove('hidden');
+
+      ws.send(JSON.stringify({
+        type: 'FILE_READ_REQ',
+        deviceId: selectedDeviceId,
+        payload: { deviceId: selectedDeviceId, path: filePath }
+      }));
+    }
+
+    function handleEditorFileContent(payload) {
+      if (payload.error) {
+        document.getElementById('editorTextarea').value = `// Error loading file:\n${payload.error}`;
+        return;
+      }
+      try {
+        const decoded = decodeURIComponent(escape(atob(payload.contentBase64)));
+        document.getElementById('editorTextarea').value = decoded;
+        document.getElementById('editorCharCount').textContent = `${decoded.length} characters • ${decoded.split('\n').length} lines`;
+      } catch (e) {
+        try {
+          const raw = atob(payload.contentBase64);
+          document.getElementById('editorTextarea').value = raw;
+          document.getElementById('editorCharCount').textContent = `${raw.length} characters`;
+        } catch (e2) {
+          document.getElementById('editorTextarea').value = payload.contentBase64;
+        }
+      }
+    }
+
+    document.getElementById('editorTextarea').addEventListener('input', (e) => {
+      const val = e.target.value;
+      document.getElementById('editorCharCount').textContent = `${val.length} characters • ${val.split('\n').length} lines`;
+    });
+
+    function saveEditorFile() {
+      if (!activeEditorPath || !selectedDeviceId || !ws) return;
+      const content = document.getElementById('editorTextarea').value;
+      try {
+        const base64 = btoa(unescape(encodeURIComponent(content)));
+        ws.send(JSON.stringify({
+          type: 'FILE_WRITE_REQ',
+          deviceId: selectedDeviceId,
+          payload: {
+            deviceId: selectedDeviceId,
+            path: activeEditorPath,
+            contentBase64: base64,
+            overwrite: true
+          }
+        }));
+      } catch (e) {
+        alert("Encoding error: " + e.message);
+      }
+    }
+
+    function closeEditorModal() {
+      document.getElementById('editorModal').classList.add('hidden');
+      activeEditorPath = null;
     }
 
     function handleFileDownload(payload) {
@@ -1454,6 +1748,232 @@
         deviceId: selectedDeviceId,
         payload: { deviceId: selectedDeviceId, path: filePath }
       }));
+    }
+
+    // ==============================================================
+    // REMOTE SCREEN VIEWER
+    // ==============================================================
+
+    function requestScreenCapture(quality = 75, maxWidth = 1280) {
+      if (!selectedDeviceId || !ws) return;
+      document.getElementById('screenSpinner').classList.remove('hidden');
+      document.getElementById('screenLiveBadge').textContent = 'CAPTURING...';
+      document.getElementById('screenLiveBadge').className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-cyan-950 text-cyan-400 border border-cyan-800 animate-pulse';
+
+      ws.send(JSON.stringify({
+        type: 'SCREEN_CAPTURE_REQ',
+        deviceId: selectedDeviceId,
+        payload: {
+          deviceId: selectedDeviceId,
+          quality: quality,
+          maxWidth: maxWidth
+        }
+      }));
+    }
+
+    function handleScreenCaptureResp(payload) {
+      document.getElementById('screenSpinner').classList.add('hidden');
+      if (payload.error) {
+        document.getElementById('screenLiveBadge').textContent = 'ERROR';
+        document.getElementById('screenLiveBadge').className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-red-950 text-red-400 border border-red-800';
+        alert('Screen capture failed: ' + payload.error);
+        return;
+      }
+
+      currentScreenBase64 = payload.imageBase64;
+      const img = document.getElementById('screenDisplayImg');
+      const placeholder = document.getElementById('screenEmptyPlaceholder');
+      img.src = 'data:image/jpeg;base64,' + payload.imageBase64;
+      img.classList.remove('hidden');
+      placeholder.classList.add('hidden');
+
+      document.getElementById('fullscreenDisplayImg').src = img.src;
+      document.getElementById('screenMetaResolution').textContent = `Resolution: ${payload.width}x${payload.height}`;
+      document.getElementById('screenMetaTimestamp').textContent = `Captured: ${new Date(payload.timestamp * 1000).toLocaleTimeString()}`;
+      document.getElementById('screenLiveBadge').textContent = 'LIVE VIEW';
+      document.getElementById('screenLiveBadge').className = 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-950 text-emerald-400 border border-emerald-800';
+    }
+
+    function toggleLiveStream() {
+      const btn = document.getElementById('toggleLiveStreamBtn');
+      if (liveStreamInterval) {
+        clearInterval(liveStreamInterval);
+        liveStreamInterval = null;
+        btn.innerHTML = '<span>🔄</span> Auto (2s)';
+        btn.className = 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 font-mono text-xs rounded-lg transition flex items-center gap-1';
+        document.getElementById('screenLiveBadge').textContent = 'STANDBY';
+      } else {
+        requestScreenCapture();
+        liveStreamInterval = setInterval(() => {
+          if (currentTab === 'screen' && selectedDeviceId) {
+            requestScreenCapture(60, 1024);
+          }
+        }, 2200);
+        btn.innerHTML = '<span>⏹️</span> Stop Stream';
+        btn.className = 'px-3 py-1.5 bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 font-mono text-xs rounded-lg transition flex items-center gap-1';
+      }
+    }
+
+    function downloadCurrentScreen() {
+      if (!currentScreenBase64) {
+        alert("No screenshot available to download. Click Capture first.");
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = 'data:image/jpeg;base64,' + currentScreenBase64;
+      link.download = `screenshot_${selectedDeviceId || 'desktop'}_${Date.now()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function openFullscreenScreen() {
+      if (!currentScreenBase64) return;
+      document.getElementById('fullscreenScreenModal').classList.remove('hidden');
+    }
+
+    function closeFullscreenScreen() {
+      document.getElementById('fullscreenScreenModal').classList.add('hidden');
+    }
+
+    // ==============================================================
+    // HISTORICAL TELEMETRY & ANALYTICS CHARTS (CHART.JS)
+    // ==============================================================
+
+    let cpuChartInstance = null;
+    let ramChartInstance = null;
+
+    function initCharts() {
+      if (cpuChartInstance && ramChartInstance) return;
+
+      const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        scales: {
+          x: {
+            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+            ticks: { color: '#64748b', font: { size: 10, family: 'monospace' } }
+          },
+          y: {
+            min: 0,
+            max: 100,
+            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+            ticks: { color: '#64748b', font: { size: 10, family: 'monospace' }, callback: v => v + '%' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#090d16',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleFont: { family: 'monospace' },
+            bodyFont: { family: 'monospace' }
+          }
+        }
+      };
+
+      const cpuCtx = document.getElementById('cpuHistoryChart');
+      if (cpuCtx) {
+        cpuChartInstance = new Chart(cpuCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'CPU Load',
+              data: [],
+              borderColor: '#22c55e',
+              backgroundColor: 'rgba(34, 197, 94, 0.12)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.35,
+              pointRadius: 2
+            }]
+          },
+          options: chartOptions
+        });
+      }
+
+      const ramCtx = document.getElementById('ramHistoryChart');
+      if (ramCtx) {
+        ramChartInstance = new Chart(ramCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'RAM Usage',
+              data: [],
+              borderColor: '#06b6d4',
+              backgroundColor: 'rgba(6, 182, 212, 0.12)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.35,
+              pointRadius: 2
+            }]
+          },
+          options: chartOptions
+        });
+      }
+    }
+
+    async function loadAnalyticsHistory(limit = 60) {
+      if (!selectedDeviceId) return;
+      initCharts();
+      try {
+        const res = await fetch(`/api/telemetry/history?device_id=${encodeURIComponent(selectedDeviceId)}&limit=${limit}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const points = data.points || [];
+        if (points.length === 0) return;
+
+        const labels = points.map(p => new Date(p.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        const cpuData = points.map(p => Math.round(p.cpuPercent));
+        const ramData = points.map(p => Math.round(p.ramPercent));
+
+        if (cpuChartInstance) {
+          cpuChartInstance.data.labels = labels;
+          cpuChartInstance.data.datasets[0].data = cpuData;
+          cpuChartInstance.update();
+        }
+        if (ramChartInstance) {
+          ramChartInstance.data.labels = labels;
+          ramChartInstance.data.datasets[0].data = ramData;
+          ramChartInstance.update();
+        }
+
+        const last = points[points.length - 1];
+        document.getElementById('analyticsCpuNow').textContent = `${Math.round(last.cpuPercent)}%`;
+        document.getElementById('analyticsRamNow').textContent = `${Math.round(last.ramPercent)}%`;
+      } catch (e) {
+        console.error("Failed to load analytics history", e);
+      }
+    }
+
+    function updateChartsWithPoint(p) {
+      if (!cpuChartInstance || !ramChartInstance) return;
+      const timeLabel = new Date(p.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const cpu = Math.round(p.cpuPercent);
+      const ram = Math.round(p.ramPercent);
+
+      document.getElementById('analyticsCpuNow').textContent = `${cpu}%`;
+      document.getElementById('analyticsRamNow').textContent = `${ram}%`;
+
+      if (cpuChartInstance.data.labels.length > 60) {
+        cpuChartInstance.data.labels.shift();
+        cpuChartInstance.data.datasets[0].data.shift();
+      }
+      cpuChartInstance.data.labels.push(timeLabel);
+      cpuChartInstance.data.datasets[0].data.push(cpu);
+      cpuChartInstance.update();
+
+      if (ramChartInstance.data.labels.length > 60) {
+        ramChartInstance.data.labels.shift();
+        ramChartInstance.data.datasets[0].data.shift();
+      }
+      ramChartInstance.data.labels.push(timeLabel);
+      ramChartInstance.data.datasets[0].data.push(ram);
+      ramChartInstance.update();
     }
 
     // Upload

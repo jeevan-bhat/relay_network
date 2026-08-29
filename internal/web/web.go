@@ -62,6 +62,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/results", s.handleResults)
 	mux.HandleFunc("/api/audit", s.handleAuditLogs)
 	mux.HandleFunc("/api/wol", s.handleWakeOnLAN)
+	mux.HandleFunc("/api/telemetry/history", s.handleTelemetryHistory)
 
 	// Static UI assets
 	sub, err := fs.Sub(staticFS, "static")
@@ -539,6 +540,34 @@ func (s *Server) handleDownloadAgentExe(w http.ResponseWriter, r *http.Request) 
 	// 3. If not found on disk, redirect to raw binary
 	rawGitHubURL := "https://raw.githubusercontent.com/jeevan-bhat/relay_network/main/agent/terminal-agent.exe"
 	http.Redirect(w, r, rawGitHubURL, http.StatusTemporaryRedirect)
+}
+
+func (s *Server) handleTelemetryHistory(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.URL.Query().Get("device_id")
+	if deviceID == "" {
+		http.Error(w, "missing device_id", http.StatusBadRequest)
+		return
+	}
+	limitStr := r.URL.Query().Get("limit")
+	limit := 60
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		limit = l
+	}
+
+	points, err := s.store.GetTelemetryHistory(deviceID, limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if points == nil {
+		points = []protocol.TelemetryPoint{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(protocol.TelemetryHistoryResponse{
+		DeviceID: deviceID,
+		Points:   points,
+	})
 }
 
 
